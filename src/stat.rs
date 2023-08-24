@@ -243,6 +243,7 @@ mod tests {
     fn assert_window_sizes(w: &WindowVec, len: usize, window_size: usize) {
         assert_eq!(w.len(), len, "incorrect number of windows");
         for (i, r) in w.iter().enumerate() {
+            assert!(r.is_some(), "missing window for {}", i);
             if let Some((start, end)) = r {
                 assert_eq!(
                     end - start,
@@ -250,8 +251,32 @@ mod tests {
                     "incorrect window size for {}",
                     i
                 );
-            } else {
-                println!("Window {}: None", i);
+            }
+        }
+    }
+
+    fn assert_every_nth(w: &WindowVec, n: usize, window_size: Option<usize>) {
+        for (i, r) in w.iter().enumerate() {
+            if i % n == 0 {
+                if window_size.is_none() {
+                    assert!(r.is_none());
+                    continue;
+                }
+
+                if window_size.is_some() {
+                    assert!(r.is_some());
+                }
+
+                if let Some((start, end)) = r {
+                    if let Some(window_size) = window_size {
+                        assert_eq!(
+                            end - start,
+                            window_size - 1,
+                            "incorrect window size for {}",
+                            i
+                        );
+                    }
+                }
             }
         }
     }
@@ -316,5 +341,6 @@ mod tests {
         );
 
         println!("{} - {:?}", windows.len(), windows);
+        assert_every_nth(&windows, 5, Some(1));
     }
 }
