@@ -68,6 +68,8 @@ pub struct Series<T> {
     pub values: SeriesValues<T>,
 }
 
+type WindowVec = Vec<Option<(usize, usize)>>;
+
 impl<T: Zero + Copy> Series<T> {
     pub fn new() -> Self {
         Self {
@@ -154,7 +156,7 @@ impl<T: Zero + Copy> Series<T> {
         }
     }
 
-    pub fn windows(&self, window_size: Duration, start_ts: i64) -> Vec<Option<(usize, usize)>> {
+    pub fn windows(&self, window_size: Duration, start_ts: i64) -> WindowVec {
         if self.is_empty() {
             return Vec::new();
         }
@@ -175,7 +177,7 @@ impl<T: Zero + Copy> Series<T> {
             let window_end_ts = window_start_ts + window_size.as_millis() as i64;
 
             let mut start_index = Some(last_index);
-            let mut end_index = Some(values.len() - 1);
+            let mut end_index = None;
 
             for (j, sample) in values.iter().enumerate().skip(last_index) {
                 if sample.0 >= window_start_ts && sample.0 < (window_end_ts - 1) {
@@ -195,13 +197,22 @@ impl<T: Zero + Copy> Series<T> {
 
             if let Some(start_index) = start_index {
                 if let Some(end_index) = end_index {
-                    windows.push(Some((start_index, end_index)));
+                    if end_index < start_index {
+                        // No samples in this window
+                        windows.push(None);
+                    } else {
+                        windows.push(Some((start_index, end_index)));
+                    }
                     last_index = end_index + 1;
                     continue;
+                } else {
+                    // Last window
+                    windows.push(Some((start_index, values.len() - 1)));
+                    break;
                 }
             }
 
-            windows.push(None);
+            unreachable!()
         }
 
         windows
@@ -229,8 +240,24 @@ mod tests {
 
     use super::*;
 
+    fn assert_window_sizes(w: &WindowVec, len: usize, window_size: usize) {
+        assert_eq!(w.len(), len, "incorrect number of windows");
+        for (i, r) in w.iter().enumerate() {
+            if let Some((start, end)) = r {
+                assert_eq!(
+                    end - start,
+                    window_size - 1,
+                    "incorrect window size for {}",
+                    i
+                );
+            } else {
+                println!("Window {}: None", i);
+            }
+        }
+    }
+
     #[test]
-    fn it_works() {
+    fn windowing() {
         let mut s = Series::new();
 
         // Make a 10 minute series with 10 second intervals
@@ -257,19 +284,37 @@ mod tests {
                 .timestamp_millis(),
         );
 
-        // Expect 10 windows
-        println!("Series: {}", s);
-        println!("Windows ({}): {:?}", windows.len(), windows);
-        assert_eq!(windows.len(), 10);
+        // Expect 10 windows with 6 samples each
+        assert_window_sizes(&windows, 10, 6);
 
-        // Expect each window to have 5 samples
-        for (i, r) in windows.iter().enumerate() {
-            if let Some((start, end)) = r {
-                println!("Window {}: {} - {}", i, start, end);
-                assert_eq!(end - start, 5);
-            } else {
-                println!("Window {}: None", i);
-            }
-        }
+        // Break it into 2 minute windows
+        let windows = s.windows(
+            Duration::from_secs(120),
+            Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
+                .unwrap()
+                .timestamp_millis(),
+        );
+
+        assert_window_sizes(&windows, 5, 12);
+
+        // Break it into 30 second windows
+        let windows = s.windows(
+            Duration::from_secs(30),
+            Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
+                .unwrap()
+                .timestamp_millis(),
+        );
+
+        assert_window_sizes(&windows, 20, 3);
+
+        // Break it into 2 second windows
+        let windows = s.windows(
+            Duration::from_secs(2),
+            Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
+                .unwrap()
+                .timestamp_millis(),
+        );
+
+        println!("{} - {:?}", windows.len(), windows);
     }
 }
