@@ -1,4 +1,5 @@
 use crate::{
+    base::{Duration, TimeStamp},
     sample::SampleValue,
     series::{Element, Series},
     window_ops::Op,
@@ -30,10 +31,10 @@ pub struct WindowIter<'a, T: SampleValue> {
     series: &'a Series<T>,
 
     /// The size of each window.
-    window_size: i64,
+    window_size: Duration,
 
     /// The timestamp of the first window.
-    start_ts: i64,
+    start_ts: TimeStamp,
 
     /// The number of windows.
     num_windows: usize,
@@ -50,9 +51,10 @@ pub struct WindowIter<'a, T: SampleValue> {
 
 impl<'a, T: SampleValue> WindowIter<'a, T> {
     /// Create a new window iterator.
-    pub fn new(series: &'a Series<T>, window_size: i64, start_ts: i64) -> Self {
+    pub fn new(series: &'a Series<T>, window_size: Duration, start_ts: TimeStamp) -> Self {
         let last_sample_ts = series.values.last().unwrap().0;
-        let mut num_windows = ((last_sample_ts - start_ts) / window_size) + 1;
+        let mut num_windows =
+            ((last_sample_ts.millis() - start_ts.millis()) / window_size.millis()) + 1;
 
         if last_sample_ts < start_ts {
             num_windows = 0;
@@ -88,14 +90,15 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
             return None;
         }
 
-        let window_start_ts = self.start_ts + (self.current_window as i64 * self.window_size);
-        let window_end_ts = window_start_ts + self.window_size;
+        let window_start_ts =
+            self.start_ts.millis() + (self.current_window as i64 * self.window_size.millis());
+        let window_end_ts = window_start_ts + self.window_size.millis();
 
         let mut start_index = Some(self.last_index);
         let mut end_index = None;
 
-        for (j, sample) in self.series.values.iter().enumerate().skip(self.last_index) {
-            if sample.0 >= window_start_ts && sample.0 < window_end_ts {
+        for (j, element) in self.series.values.iter().enumerate().skip(self.last_index) {
+            if element.0.millis() >= window_start_ts && element.0.millis() < window_end_ts {
                 start_index = Some(j);
                 break;
             }
@@ -103,7 +106,7 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
 
         if let Some(start_index) = start_index {
             for (j, sample) in self.series.values.iter().enumerate().skip(start_index) {
-                if sample.0 >= window_end_ts {
+                if sample.0.millis() >= window_end_ts {
                     end_index = Some(j - 1);
                     break;
                 }
@@ -181,8 +184,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use chrono::{TimeZone, Utc};
 
     use crate::{
@@ -254,10 +255,11 @@ mod tests {
         // Break it into 1 minute windows
         let windows = s
             .windows_iter(
-                Duration::from_secs(60).as_millis() as i64,
+                Duration::from_secs(60),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
-                    .timestamp_millis(),
+                    .timestamp_millis()
+                    .into(),
             )
             .collect::<Vec<Window>>();
 
@@ -270,10 +272,11 @@ mod tests {
         // Break it into 2 minute windows
         let windows = s
             .windows_iter(
-                Duration::from_secs(120).as_millis() as i64,
+                Duration::from_secs(120),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
-                    .timestamp_millis(),
+                    .timestamp_millis()
+                    .into(),
             )
             .collect::<Vec<Window>>();
 
@@ -282,10 +285,11 @@ mod tests {
         // Break it into 30 second windows
         let windows = s
             .windows_iter(
-                Duration::from_secs(30).as_millis() as i64,
+                Duration::from_secs(30),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
-                    .timestamp_millis(),
+                    .timestamp_millis()
+                    .into(),
             )
             .collect::<Vec<Window>>();
 
@@ -294,14 +298,14 @@ mod tests {
         // Break it into 2 second windows
         let windows = s
             .windows_iter(
-                Duration::from_secs(2).as_millis() as i64,
+                Duration::from_secs(2),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
-                    .timestamp_millis(),
+                    .timestamp_millis()
+                    .into(),
             )
             .collect::<Vec<Window>>();
 
-        println!("{:?}", windows);
         assert_every_nth(&windows, 5, Some(1));
     }
 
@@ -325,17 +329,12 @@ mod tests {
 
         // Break it into 1 minute windows
         let windows = s.windows_iter(
-            Duration::from_secs(60).as_millis() as i64,
+            Duration::from_secs(60),
             Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                 .unwrap()
-                .timestamp_millis(),
+                .timestamp_millis()
+                .into(),
         );
-
-        for (i, element) in windows.clone().samples().enumerate() {
-            for e in element {
-                println!("{} {}", i, e);
-            }
-        }
 
         for i in windows.clone().aggregate(max) {
             println!("{:?}", i);

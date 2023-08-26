@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::{
+    base::*,
     sample::{Sample, SampleValue},
     util::ts_to_utc,
     window::WindowIter,
@@ -8,16 +9,16 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Element<T: SampleValue>(pub i64, pub Sample<T>);
+pub struct Element<T: SampleValue>(pub TimeStamp, pub Sample<T>);
 impl<T: SampleValue> fmt::Display for Element<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {}", ts_to_utc(self.0), self.1)
     }
 }
 
-impl<T: SampleValue> From<(i64, Sample<T>)> for Element<T> {
-    fn from((ts, sample): (i64, Sample<T>)) -> Self {
-        Self(ts, sample)
+impl<T: SampleValue, U: Into<TimeStamp>> From<(U, Sample<T>)> for Element<T> {
+    fn from((ts, sample): (U, Sample<T>)) -> Self {
+        Self(ts.into(), sample)
     }
 }
 
@@ -64,17 +65,17 @@ impl<T: SampleValue> Series<T> {
     }
 
     /// Get the sample at the given index.
-    pub fn get(&self, index: usize) -> Option<(i64, Sample<T>)> {
-        self.values.get(index).map(|s| (s.0, s.1))
+    pub fn get(&self, index: usize) -> Option<&Element<T>> {
+        self.values.get(index)
     }
 
     /// Return an iterator over windows of the series.
-    pub fn windows_iter(&self, window_size: i64, start_ts: i64) -> WindowIter<T> {
+    pub fn windows_iter(&self, window_size: Duration, start_ts: TimeStamp) -> WindowIter<T> {
         WindowIter::new(self, window_size, start_ts)
     }
 
     /// Returns the nearest sample after or equal to the given timestamp.
-    pub fn at_or_after(&self, ts: i64) -> Option<(i64, Sample<T>)> {
+    pub fn at_or_after(&self, ts: TimeStamp) -> Option<&Element<T>> {
         // Binary search for the first sample with a timestamp greater than or
         // equal to the given timestamp.
         let mut left = 0;
@@ -116,17 +117,17 @@ impl<T: SampleValue> fmt::Display for Series<T> {
 /// samples.
 #[derive(Debug)]
 pub struct AlignedSeries<T: SampleValue> {
-    pub start_ts: i64,
-    pub interval: i64,
+    pub start_ts: TimeStamp,
+    pub interval: Duration,
     pub values: Vec<Sample<T>>,
 }
 
 impl<T: SampleValue> AlignedSeries<T> {
     /// Create a new empty series.
-    pub fn new(start_ts: i64, interval: i64) -> Self {
+    pub fn new(interval: Duration, start_ts: TimeStamp) -> Self {
         Self {
-            start_ts,
             interval,
+            start_ts,
             values: vec![],
         }
     }
@@ -161,27 +162,30 @@ impl<T: SampleValue> AlignedSeries<T> {
     }
 
     /// Get the nearest sample after or equal to the given timestamp.
-    pub fn at_or_after(&self, ts: i64) -> Option<(i64, Sample<T>)> {
+    pub fn at_or_after(&self, ts: TimeStamp) -> Option<Element<T>> {
         if ts <= self.start_ts {
             if self.is_empty() {
                 return None;
             } else {
-                return Some((self.start_ts, self.values[0]));
+                return Some((self.start_ts, self.values[0]).into());
             }
         }
 
-        if (ts - self.start_ts) % self.interval == 0 {
-            let index = ((ts - self.start_ts) / self.interval) as usize;
+        if (ts - self.start_ts).millis() % self.interval.millis() == 0 {
+            let index = ((ts - self.start_ts).millis() / self.interval.millis()) as usize;
             if index < self.values.len() {
-                return Some((ts, self.values[index]));
+                return Some((ts, self.values[index]).into());
             }
         } else {
-            let index = ((ts - self.start_ts) / self.interval) as usize + 1;
+            let index = ((ts - self.start_ts).millis() / self.interval.millis()) as usize + 1;
             if index < self.values.len() {
-                return Some((
-                    self.start_ts + (index as i64 * self.interval),
-                    self.values[index],
-                ));
+                return Some(
+                    (
+                        self.start_ts.millis() + (index as i64 * self.interval.millis()),
+                        self.values[index],
+                    )
+                        .into(),
+                );
             }
         }
 
@@ -198,7 +202,7 @@ where
             write!(
                 f,
                 "\n {} {}",
-                ts_to_utc(self.start_ts + (i as i64 * self.interval)),
+                ts_to_utc(self.start_ts.millis() + (i as i64 * self.interval.millis())),
                 sample
             )?;
         }
@@ -227,16 +231,28 @@ mod tests {
         series.push(8, 8);
         series.push(9, 9);
 
-        assert_eq!(series.at_or_after(0).unwrap().0, 0);
-        assert!(series.at_or_after(0).unwrap().1.equals(&Sample::point(0)));
+        assert_eq!(series.at_or_after(TimeStamp(0)).unwrap().0, TimeStamp(0));
+        assert!(series
+            .at_or_after(0.into())
+            .unwrap()
+            .1
+            .equals(&Sample::point(0)));
 
-        assert_eq!(series.at_or_after(1).unwrap().0, 1);
-        assert!(series.at_or_after(1).unwrap().1.equals(&Sample::point(1)));
+        assert_eq!(series.at_or_after(1.into()).unwrap().0, 1.into());
+        assert!(series
+            .at_or_after(TimeStamp(1))
+            .unwrap()
+            .1
+            .equals(&Sample::point(1)));
 
-        assert_eq!(series.at_or_after(9).unwrap().0, 9);
-        assert!(series.at_or_after(9).unwrap().1.equals(&Sample::point(9)));
+        assert_eq!(series.at_or_after(TimeStamp(9)).unwrap().0, 9.into());
+        assert!(series
+            .at_or_after(TimeStamp(9))
+            .unwrap()
+            .1
+            .equals(&Sample::point(9)));
 
-        assert!(series.at_or_after(10).is_none())
+        assert!(series.at_or_after(TimeStamp(10)).is_none())
     }
 
     #[test]
@@ -251,33 +267,61 @@ mod tests {
         series.push(4033, 6);
         series.push(9000, 7);
 
-        assert_eq!(series.at_or_after(0).unwrap().0, 0);
-        assert!(series.at_or_after(0).unwrap().1.equals(&Sample::point(0)),);
+        assert_eq!(series.at_or_after(TimeStamp(0)).unwrap().0, 0.into());
+        assert!(series
+            .at_or_after(TimeStamp(0))
+            .unwrap()
+            .1
+            .equals(&Sample::point(0)),);
 
-        assert_eq!(series.at_or_after(1).unwrap().0, 200);
-        assert!(series.at_or_after(1).unwrap().1.equals(&Sample::point(1)),);
+        assert_eq!(series.at_or_after(TimeStamp(1)).unwrap().0, 200.into());
+        assert!(series
+            .at_or_after(TimeStamp(1))
+            .unwrap()
+            .1
+            .equals(&Sample::point(1)),);
 
-        assert_eq!(series.at_or_after(2).unwrap().0, 200);
-        assert!(series.at_or_after(2).unwrap().1.equals(&Sample::point(1)),);
+        assert_eq!(series.at_or_after(TimeStamp(2)).unwrap().0, 200.into());
+        assert!(series
+            .at_or_after(TimeStamp(2))
+            .unwrap()
+            .1
+            .equals(&Sample::point(1)),);
 
-        assert_eq!(series.at_or_after(201).unwrap().0, 350);
-        assert!(series.at_or_after(201).unwrap().1.equals(&Sample::point(2)));
+        assert_eq!(series.at_or_after(TimeStamp(201)).unwrap().0, 350.into());
+        assert!(series
+            .at_or_after(TimeStamp(201))
+            .unwrap()
+            .1
+            .equals(&Sample::point(2)));
 
-        assert_eq!(series.at_or_after(350).unwrap().0, 350);
-        assert!(series.at_or_after(350).unwrap().1.equals(&Sample::point(2)));
+        assert_eq!(series.at_or_after(TimeStamp(350)).unwrap().0, 350.into());
+        assert!(series
+            .at_or_after(TimeStamp(350))
+            .unwrap()
+            .1
+            .equals(&Sample::point(2)));
 
-        assert_eq!(series.at_or_after(351).unwrap().0, 500);
-        assert!(series.at_or_after(351).unwrap().1.equals(&Sample::point(3)));
+        assert_eq!(series.at_or_after(TimeStamp(351)).unwrap().0, 500.into());
+        assert!(series
+            .at_or_after(TimeStamp(351))
+            .unwrap()
+            .1
+            .equals(&Sample::point(3)));
 
-        assert_eq!(series.at_or_after(500).unwrap().0, 500);
-        assert!(series.at_or_after(500).unwrap().1.equals(&Sample::point(3)));
+        assert_eq!(series.at_or_after(TimeStamp(500)).unwrap().0, 500.into());
+        assert!(series
+            .at_or_after(TimeStamp(500))
+            .unwrap()
+            .1
+            .equals(&Sample::point(3)));
 
-        assert!(series.at_or_after(9001).is_none());
+        assert!(series.at_or_after(TimeStamp(9001)).is_none());
     }
 
     #[test]
     fn aligned_series() {
-        let mut series = AlignedSeries::new(1000, 100);
+        let mut series = AlignedSeries::new(Duration(100), TimeStamp(1000));
         series.push(0);
         series.push(1);
         series.push(2);
@@ -289,35 +333,43 @@ mod tests {
         series.push(8);
         series.push(9);
 
-        assert_eq!(series.at_or_after(0).unwrap().0, 1000);
-        assert!(series.at_or_after(0).unwrap().1.equals(&Sample::point(0)));
-
-        assert_eq!(series.at_or_after(999).unwrap().0, 1000);
-        assert!(series.at_or_after(999).unwrap().1.equals(&Sample::point(0)));
-
-        assert_eq!(series.at_or_after(1000).unwrap().0, 1000);
+        assert_eq!(series.at_or_after(TimeStamp(0)).unwrap().0, 1000.into());
         assert!(series
-            .at_or_after(1000)
+            .at_or_after(TimeStamp(0))
             .unwrap()
             .1
             .equals(&Sample::point(0)));
 
-        assert_eq!(series.at_or_after(1010).unwrap().0, 1100);
+        assert_eq!(series.at_or_after(TimeStamp(999)).unwrap().0, 1000.into());
         assert!(series
-            .at_or_after(1010)
+            .at_or_after(TimeStamp(999))
+            .unwrap()
+            .1
+            .equals(&Sample::point(0)));
+
+        assert_eq!(series.at_or_after(TimeStamp(1000)).unwrap().0, 1000.into());
+        assert!(series
+            .at_or_after(TimeStamp(1000))
+            .unwrap()
+            .1
+            .equals(&Sample::point(0)));
+
+        assert_eq!(series.at_or_after(TimeStamp(1010)).unwrap().0, 1100.into());
+        assert!(series
+            .at_or_after(TimeStamp(1010))
             .unwrap()
             .1
             .equals(&Sample::point(1)));
 
-        assert_eq!(series.at_or_after(1100).unwrap().0, 1100);
+        assert_eq!(series.at_or_after(TimeStamp(1100)).unwrap().0, 1100.into());
         assert!(series
-            .at_or_after(1100)
+            .at_or_after(TimeStamp(1100))
             .unwrap()
             .1
             .equals(&Sample::point(1)));
 
-        assert_eq!(series.at_or_after(1900).unwrap().0, 1900);
-        assert!(series.at_or_after(1901).is_none());
+        assert_eq!(series.at_or_after(TimeStamp(1900)).unwrap().0, 1900.into());
+        assert!(series.at_or_after(TimeStamp(1910)).is_none());
     }
 
     #[test]
@@ -341,15 +393,15 @@ mod tests {
 
         println!("series: {}\n\n", series);
 
-        for e in series.windows_iter(5, 0) {
+        for e in series.windows_iter(Duration(5), TimeStamp(0)) {
             println!("w: {:?}", e);
         }
 
-        for e in series.windows_iter(5, 0).samples() {
+        for e in series.windows_iter(Duration(5), TimeStamp(0)).samples() {
             println!("e: {:?}", e);
         }
 
-        let mut aligned_series = AlignedSeries::new(0, 5);
+        let mut aligned_series = AlignedSeries::new(Duration(5), TimeStamp(0));
         aligned_series.push_series(&series, sum);
         println!("aligned_series: {}\n\n", aligned_series);
     }

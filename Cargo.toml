@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.72"
 chrono = "0.4.26"
+derive_more = "0.99.17"
 float-ord = "0.3.2"
 num = "0.4.1"
 num-traits = "0.2.16"

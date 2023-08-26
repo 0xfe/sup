@@ -1,3 +1,4 @@
+pub mod base;
 pub mod sample;
 pub mod series;
 pub mod util;
