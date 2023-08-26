@@ -277,6 +277,26 @@ mod tests {
         // Expect 10 windows with 6 samples each
         assert_window_sizes(&windows, 10, 6);
 
+        // Break it into 1 minute windows with an end timestamp
+        let windows = s
+            .windows(
+                Duration::from_secs(60),
+                Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
+                    .unwrap()
+                    .timestamp_millis()
+                    .into(),
+            )
+            .with_end_ts(
+                Utc.with_ymd_and_hms(2023, 1, 1, 1, 5, 0)
+                    .unwrap()
+                    .timestamp_millis()
+                    .into(),
+            )
+            .collect::<Vec<Window>>();
+
+        // Expect 5 windows with 6 samples each
+        assert_window_sizes(&windows, 5, 6);
+
         // Break it into 2 minute windows
         let windows = s
             .windows(
