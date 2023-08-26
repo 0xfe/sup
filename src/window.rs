@@ -95,7 +95,7 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
         let mut end_index = None;
 
         for (j, sample) in self.series.values.iter().enumerate().skip(self.last_index) {
-            if sample.0 >= window_start_ts && sample.0 < (window_end_ts - 1) {
+            if sample.0 >= window_start_ts && sample.0 < window_end_ts {
                 start_index = Some(j);
                 break;
             }
@@ -103,7 +103,7 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
 
         if let Some(start_index) = start_index {
             for (j, sample) in self.series.values.iter().enumerate().skip(start_index) {
-                if sample.0 >= (window_end_ts - 1) {
+                if sample.0 >= window_end_ts {
                     end_index = Some(j - 1);
                     break;
                 }
@@ -261,6 +261,9 @@ mod tests {
             )
             .collect::<Vec<Window>>();
 
+        for w in windows.clone() {
+            println!("{:?}", w);
+        }
         // Expect 10 windows with 6 samples each
         assert_window_sizes(&windows, 10, 6);
 

@@ -7,8 +7,8 @@ use crate::sample::SampleValue;
 pub type Op<T> = fn(&[T]) -> T;
 
 pub fn max<T: SampleValue>(values: &[T]) -> T {
-    let mut max = values[0];
-    (1..values.len()).for_each(|i| {
+    let mut max = T::zero();
+    (0..values.len()).for_each(|i| {
         let val = values[i];
         if val > max {
             max = val;
@@ -18,8 +18,12 @@ pub fn max<T: SampleValue>(values: &[T]) -> T {
 }
 
 pub fn min<T: SampleValue>(values: &[T]) -> T {
+    if values.is_empty() {
+        return T::zero();
+    }
+
     let mut min = values[0];
-    (1..values.len()).for_each(|i| {
+    (0..values.len()).for_each(|i| {
         let val = values[i];
         if val < min {
             min = val;
@@ -29,8 +33,8 @@ pub fn min<T: SampleValue>(values: &[T]) -> T {
 }
 
 pub fn sum<T: SampleValue>(values: &[T]) -> T {
-    let mut sum = values[0];
-    (1..values.len()).for_each(|i| {
+    let mut sum = T::zero();
+    (0..values.len()).for_each(|i| {
         let val = values[i];
         sum = sum + val;
     });
@@ -38,8 +42,12 @@ pub fn sum<T: SampleValue>(values: &[T]) -> T {
 }
 
 pub fn mean<T: SampleValue + NumCast + Div<Output = T>>(values: &[T]) -> T {
-    let mut sum = values[0];
-    (1..values.len()).for_each(|i| {
+    if values.is_empty() {
+        return T::zero();
+    }
+
+    let mut sum = T::zero();
+    (0..values.len()).for_each(|i| {
         let val = values[i];
         sum = sum + val;
     });

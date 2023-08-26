@@ -189,10 +189,27 @@ impl<T: SampleValue> AlignedSeries<T> {
     }
 }
 
+impl<T> fmt::Display for AlignedSeries<T>
+where
+    T: SampleValue + fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, sample) in self.values.iter().enumerate() {
+            write!(
+                f,
+                "\n {} {}",
+                ts_to_utc(self.start_ts + (i as i64 * self.interval)),
+                sample
+            )?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
-    use crate::sample::SampleEquals;
+    use crate::{sample::SampleEquals, window_ops::sum};
 
     use super::*;
 
@@ -301,5 +318,39 @@ mod tests {
 
         assert_eq!(series.at_or_after(1900).unwrap().0, 1900);
         assert!(series.at_or_after(1901).is_none());
+    }
+
+    #[test]
+    fn to_aligned_series() {
+        let mut series = Series::new();
+        series.push(0, 1);
+        series.push(2, 1);
+        series.push(3, 1);
+        series.push(4, 1);
+        series.push(6, 1);
+        series.push(7, 1);
+        series.push(9, 1);
+        series.push(15, 1);
+        series.push(22, 1);
+        series.push(28, 1);
+        series.push(30, 1);
+        series.push(31, 1);
+        series.push(32, 1);
+        series.push(35, 1);
+        series.push(40, 1);
+
+        println!("series: {}\n\n", series);
+
+        for e in series.windows_iter(5, 0) {
+            println!("w: {:?}", e);
+        }
+
+        for e in series.windows_iter(5, 0).samples() {
+            println!("e: {:?}", e);
+        }
+
+        let mut aligned_series = AlignedSeries::new(0, 5);
+        aligned_series.push_series(&series, sum);
+        println!("aligned_series: {}\n\n", aligned_series);
     }
 }
