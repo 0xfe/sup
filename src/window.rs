@@ -1,9 +1,9 @@
 use crate::{
     base::{Duration, TimeStamp},
     element::Element,
-    ops::WindowOp,
+    ops::Op,
+    raw_series::RawSeries,
     sample::{Sample, SampleValue},
-    series::RawSeries,
 };
 
 /// A window is either empty or a range of indices into a raw series.
@@ -138,7 +138,7 @@ impl<'a, T> WindowSamples<'a, T>
 where
     T: SampleValue,
 {
-    pub fn aggregate(&'a mut self, f: WindowOp<T>) -> WindowAggregates<'a, T> {
+    pub fn aggregate(&'a mut self, f: Op<T>) -> WindowAggregates<'a, T> {
         WindowAggregates { iter: self, f }
     }
 }
@@ -159,7 +159,7 @@ where
 
 pub struct WindowAggregates<'a, T: SampleValue> {
     iter: &'a mut WindowSamples<'a, T>,
-    f: WindowOp<T>,
+    f: Op<T>,
 }
 
 impl<'a, T> Iterator for WindowAggregates<'a, T>

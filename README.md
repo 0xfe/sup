@@ -9,6 +9,7 @@
 - Sample types
   - Zero/Reset types
   - Point<T>
+  - Element(TimeStamp, Sample)
 - Unaligned TimeSeries
 - Aligned TimeSeries
 - Window Primitive and iterator

@@ -7,7 +7,7 @@ use crate::{
     sample::{Sample, SampleValue},
 };
 
-pub type WindowOp<T> = fn(&[Element<T>]) -> Sample<T>;
+pub type Op<T> = fn(&[Element<T>]) -> Sample<T>;
 
 pub fn max<T: SampleValue>(values: &[Element<T>]) -> Sample<T> {
     let mut max = Sample::Err;
