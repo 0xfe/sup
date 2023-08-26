@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::{sample::SampleValue, series::Series};
 
 /// A window is either empty or a range of indices into a series.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Window {
     Empty,
     Range(usize, usize),
@@ -40,6 +40,9 @@ pub struct WindowIter<'a, T: SampleValue> {
 
     /// The index of the last sample returned.
     last_index: usize,
+
+    /// Next value
+    next: Option<Window>,
 }
 
 impl<'a, T: SampleValue> WindowIter<'a, T> {
@@ -59,7 +62,24 @@ impl<'a, T: SampleValue> WindowIter<'a, T> {
             num_windows: num_windows as usize,
             current_window: 0,
             last_index: 0,
+            next: None,
         }
+    }
+
+    /// Returns the max value of the current window. If the window is empty,
+    /// returns None.
+    pub fn max(&self) -> Option<T> {
+        if let Some(Window::Range(start, end)) = self.next.as_ref() {
+            let mut max = self.series.values[*start].1.val();
+            for i in *start..=*end {
+                let val = self.series.values[i].1.val();
+                if val > max {
+                    max = val;
+                }
+            }
+            return Some(max);
+        }
+        None
     }
 }
 
@@ -69,6 +89,7 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
     /// Returns the next window.
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_window >= self.num_windows {
+            self.next = None;
             return None;
         }
 
@@ -100,18 +121,18 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
             if let Some(end_index) = end_index {
                 if end_index < start_index {
                     // No samples in this window
-                    return Some(Window::Empty);
+                    self.next = Some(Window::Empty);
                 } else {
                     self.last_index = end_index + 1;
-                    return Some(Window::Range(start_index, end_index));
+                    self.next = Some(Window::Range(start_index, end_index));
                 }
             } else {
                 // Last window
-                return Some(Window::Range(start_index, self.series.values.len() - 1));
+                self.next = Some(Window::Range(start_index, self.series.values.len() - 1));
             }
         }
 
-        unreachable!()
+        self.next.clone()
     }
 }
 
@@ -231,5 +252,36 @@ mod tests {
 
         println!("{:?}", windows);
         assert_every_nth(&windows, 5, Some(1));
+    }
+
+    #[test]
+    fn aggregation() {
+        let mut s = Series::new();
+
+        // Make a 10 minute series with 10 second intervals
+        let mut c = 0;
+        for i in 0..10 {
+            for j in 0..6 {
+                s.push_sample(
+                    Utc.with_ymd_and_hms(2023, 1, 1, 1, i, j * 10)
+                        .unwrap()
+                        .timestamp_millis(),
+                    Sample::point(c),
+                );
+                c += 1;
+            }
+        }
+
+        // Break it into 1 minute windows
+        let windows = s.windows_iter(
+            Duration::from_secs(60),
+            Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
+                .unwrap()
+                .timestamp_millis(),
+        );
+
+        for i in windows {
+            println!("{:?}", i);
+        }
     }
 }

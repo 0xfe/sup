@@ -1,7 +1,7 @@
 use num_traits::Zero;
 use std::fmt;
 
-pub trait SampleValue: Zero + Copy + PartialEq + fmt::Display {}
+pub trait SampleValue: Zero + Copy + PartialEq + PartialOrd + fmt::Display {}
 
 impl SampleValue for i32 {}
 impl SampleValue for i64 {}
@@ -21,19 +21,27 @@ pub enum Sample<T: SampleValue> {
 }
 
 impl<T: SampleValue> Sample<T> {
-    /// Create a new sample with the given millisecond timestamp.
+    /// Create a new sample with the given value.
     pub fn point(value: T) -> Self {
         Self::Point(value)
     }
 
+    /// Create a zero-valued sample.
     pub fn zero() -> Self {
         Self::Zero
     }
 
+    /// Returns true if the sample is an error.
     pub fn is_err(&self) -> bool {
         matches!(self, Self::Err)
     }
 
+    /// Returns true if the sample is zero.
+    pub fn is_zero(&self) -> bool {
+        matches!(self, Self::Zero)
+    }
+
+    /// Returns a copy of the sample value.
     pub fn val(&self) -> T {
         match self {
             Self::Err => T::zero(),
