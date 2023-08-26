@@ -18,10 +18,6 @@ pub fn max<T: SampleValue>(values: &[T]) -> T {
 }
 
 pub fn min<T: SampleValue>(values: &[T]) -> T {
-    if values.is_empty() {
-        return T::zero();
-    }
-
     let mut min = values[0];
     (0..values.len()).for_each(|i| {
         let val = values[i];
@@ -42,10 +38,6 @@ pub fn sum<T: SampleValue>(values: &[T]) -> T {
 }
 
 pub fn mean<T: SampleValue + NumCast + Div<Output = T>>(values: &[T]) -> T {
-    if values.is_empty() {
-        return T::zero();
-    }
-
     let mut sum = T::zero();
     (0..values.len()).for_each(|i| {
         let val = values[i];
