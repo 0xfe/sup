@@ -278,7 +278,7 @@ mod tests {
 
     use super::*;
 
-    fn assert_window_sizes(w: &Vec<Window>, len: usize, window_size: usize) {
+    fn assert_window_sizes(w: &[Window], len: usize, window_size: usize) {
         assert_eq!(w.len(), len, "incorrect number of windows");
         for (i, r) in w.iter().enumerate() {
             assert!(r.is_range(), "missing window for {}", i);
@@ -293,7 +293,7 @@ mod tests {
         }
     }
 
-    fn assert_every_nth(w: &Vec<Window>, n: usize, window_size: Option<usize>) {
+    fn assert_every_nth(w: &[Window], n: usize, window_size: Option<usize>) {
         for (i, r) in w.iter().enumerate() {
             if i % n == 0 {
                 if window_size.is_none() {
