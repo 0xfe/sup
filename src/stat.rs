@@ -18,7 +18,7 @@ pub fn ts_to_utc(ts: i64) -> chrono::DateTime<chrono::Utc> {
 #[derive(Debug)]
 pub enum Sample<T> {
     Err,
-    Zero,
+    Zero, // Reset
     Point(T),
 }
 
@@ -55,113 +55,66 @@ impl<T: fmt::Display + Zero> fmt::Display for Sample<T> {
     }
 }
 
+pub enum Window {
+    Empty,
+    Range(usize, usize),
+}
+
+impl Window {
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    pub fn is_range(&self) -> bool {
+        matches!(self, Self::Range(_, _))
+    }
+}
+
 pub struct RawConfig {
     pub tz: String,
 }
 
-pub enum SeriesValues<T> {
-    Aligned(i64, i64, Vec<Sample<T>>), // start_ts, interval, samples
-    Unaligned(Vec<(i64, Sample<T>)>),  // vec<(ts, sample)>
-}
-
 pub struct Series<T> {
-    pub values: SeriesValues<T>,
+    pub values: Vec<(i64, Sample<T>)>,
 }
-
-type WindowVec = Vec<Option<(usize, usize)>>;
 
 impl<T: Zero + Copy> Series<T> {
     pub fn new() -> Self {
-        Self {
-            values: SeriesValues::Unaligned(Vec::new()),
-        }
-    }
-
-    pub fn new_aligned(start_ts: i64, interval: i64) -> Self {
-        Self {
-            values: SeriesValues::Aligned(start_ts, interval, Vec::new()),
-        }
+        Self { values: vec![] }
     }
 
     pub fn last_val(&self) -> T {
-        match &self.values {
-            SeriesValues::Aligned(_, _, samples) => samples.last().unwrap_or(&Sample::zero()).val(),
-            SeriesValues::Unaligned(samples) => {
-                samples.last().unwrap_or(&(0, Sample::zero())).1.val()
-            }
-        }
+        self.values.last().unwrap_or(&(0, Sample::zero())).1.val()
     }
 
     /// Add a new sample to the series. The timestamp must be greater than the
     /// last sample's timestamp.
-    pub fn push(&mut self, value: T) {
-        self.push_sample(Sample::point(value), None)
+    pub fn push(&mut self, ts: i64, value: T) {
+        self.push_sample(ts, Sample::point(value))
     }
 
-    pub fn push_sample(&mut self, sample: Sample<T>, ts: Option<i64>) {
-        match &mut self.values {
-            SeriesValues::Aligned(_, _, samples) => {
-                assert_eq!(ts, None);
-                samples.push(sample);
-            }
-            SeriesValues::Unaligned(samples) => {
-                assert!(ts.is_some());
-                samples.push((ts.unwrap(), sample));
-            }
-        }
+    pub fn push_sample(&mut self, ts: i64, sample: Sample<T>) {
+        self.values.push((ts, sample));
     }
 
     pub fn len(&self) -> usize {
-        match &self.values {
-            SeriesValues::Aligned(_, _, samples) => samples.len(),
-            SeriesValues::Unaligned(samples) => samples.len(),
-        }
+        self.values.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        match &self.values {
-            SeriesValues::Aligned(_, _, samples) => samples.is_empty(),
-            SeriesValues::Unaligned(samples) => samples.is_empty(),
-        }
-    }
-
-    pub fn values(&self) -> Vec<(i64, T)> {
-        match &self.values {
-            SeriesValues::Aligned(start_ts, interval, samples) => {
-                let mut values = Vec::new();
-                let mut ts = *start_ts;
-                for sample in samples {
-                    values.push((ts, sample.val()));
-                    ts += *interval;
-                }
-                values
-            }
-            SeriesValues::Unaligned(samples) => {
-                let mut values = Vec::new();
-                for (ts, sample) in samples {
-                    values.push((*ts, sample.val()));
-                }
-                values
-            }
-        }
+        self.values.is_empty()
     }
 
     pub fn get(&self, index: usize) -> Option<(i64, T)> {
-        match &self.values {
-            SeriesValues::Aligned(start_ts, interval, samples) => {
-                let ts = *start_ts + (*interval * index as i64);
-                samples.get(index).map(|s| (ts, s.val()))
-            }
-            SeriesValues::Unaligned(samples) => samples.get(index).map(|s| (s.0, s.1.val())),
-        }
+        self.values.get(index).map(|s| (s.0, s.1.val()))
     }
 
-    pub fn windows(&self, window_size: Duration, start_ts: i64) -> WindowVec {
+    pub fn windows(&self, window_size: Duration, start_ts: i64) -> Vec<Window> {
         if self.is_empty() {
             return Vec::new();
         }
 
-        let last_sample_ts = self.values().last().unwrap().0;
+        let last_sample_ts = self.values.last().unwrap().0;
         if last_sample_ts < start_ts {
             return Vec::new();
         }
@@ -169,7 +122,7 @@ impl<T: Zero + Copy> Series<T> {
         let num_windows = ((last_sample_ts - start_ts) / window_size.as_millis() as i64) + 1;
         let mut windows = Vec::with_capacity(num_windows as usize);
 
-        let values = self.values();
+        let values = &self.values;
         let mut last_index = 0;
 
         for i in 0..num_windows {
@@ -199,15 +152,15 @@ impl<T: Zero + Copy> Series<T> {
                 if let Some(end_index) = end_index {
                     if end_index < start_index {
                         // No samples in this window
-                        windows.push(None);
+                        windows.push(Window::Empty);
                     } else {
-                        windows.push(Some((start_index, end_index)));
+                        windows.push(Window::Range(start_index, end_index));
                     }
                     last_index = end_index + 1;
                     continue;
                 } else {
                     // Last window
-                    windows.push(Some((start_index, values.len() - 1)));
+                    windows.push(Window::Range(start_index, values.len() - 1));
                     break;
                 }
             }
@@ -216,6 +169,10 @@ impl<T: Zero + Copy> Series<T> {
         }
 
         windows
+    }
+
+    pub fn windows_iter(&self, window_size: Duration, start_ts: i64) -> WindowIter<T> {
+        WindowIter::new(self, window_size, start_ts)
     }
 }
 
@@ -227,10 +184,91 @@ impl<T: Zero + Copy> Default for Series<T> {
 
 impl<T: fmt::Display + Zero + Copy> fmt::Display for Series<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for sample in self.values().iter() {
+        for sample in self.values.iter() {
             write!(f, "\n {} {}", ts_to_utc(sample.0), sample.1)?;
         }
         Ok(())
+    }
+}
+
+pub struct WindowIter<'a, T> {
+    series: &'a Series<T>,
+    window_size: Duration,
+    start_ts: i64,
+    num_windows: usize,
+    current_window: usize,
+    last_index: usize,
+}
+
+impl<'a, T> WindowIter<'a, T> {
+    pub fn new(series: &'a Series<T>, window_size: Duration, start_ts: i64) -> Self {
+        let last_sample_ts = series.values.last().unwrap().0;
+        let mut num_windows = ((last_sample_ts - start_ts) / window_size.as_millis() as i64) + 1;
+
+        if last_sample_ts < start_ts {
+            num_windows = 0;
+        }
+
+        Self {
+            series,
+            window_size,
+            start_ts,
+            num_windows: num_windows as usize,
+            current_window: 0,
+            last_index: 0,
+        }
+    }
+}
+
+impl<'a, T> Iterator for WindowIter<'a, T> {
+    type Item = Window;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_window >= self.num_windows {
+            return None;
+        }
+
+        let window_start_ts =
+            self.start_ts + (self.current_window as i64 * self.window_size.as_millis() as i64);
+        let window_end_ts = window_start_ts + self.window_size.as_millis() as i64;
+
+        let mut start_index = Some(self.last_index);
+        let mut end_index = None;
+
+        for (j, sample) in self.series.values.iter().enumerate().skip(self.last_index) {
+            if sample.0 >= window_start_ts && sample.0 < (window_end_ts - 1) {
+                start_index = Some(j);
+                break;
+            }
+        }
+
+        if let Some(start_index) = start_index {
+            for (j, sample) in self.series.values.iter().enumerate().skip(start_index) {
+                if sample.0 >= (window_end_ts - 1) {
+                    end_index = Some(j - 1);
+                    break;
+                }
+            }
+        }
+
+        self.current_window += 1;
+        if let Some(start_index) = start_index {
+            if let Some(end_index) = end_index {
+                if end_index < start_index {
+                    // No samples in this window
+                    self.last_index += 1;
+                    return Some(Window::Empty);
+                } else {
+                    self.last_index = end_index + 1;
+                    return Some(Window::Range(start_index, end_index));
+                }
+            } else {
+                // Last window
+                return Some(Window::Range(start_index, self.series.values.len() - 1));
+            }
+        }
+
+        unreachable!()
     }
 }
 
@@ -240,11 +278,11 @@ mod tests {
 
     use super::*;
 
-    fn assert_window_sizes(w: &WindowVec, len: usize, window_size: usize) {
+    fn assert_window_sizes(w: &Vec<Window>, len: usize, window_size: usize) {
         assert_eq!(w.len(), len, "incorrect number of windows");
         for (i, r) in w.iter().enumerate() {
-            assert!(r.is_some(), "missing window for {}", i);
-            if let Some((start, end)) = r {
+            assert!(r.is_range(), "missing window for {}", i);
+            if let Window::Range(start, end) = r {
                 assert_eq!(
                     end - start,
                     window_size - 1,
@@ -255,19 +293,19 @@ mod tests {
         }
     }
 
-    fn assert_every_nth(w: &WindowVec, n: usize, window_size: Option<usize>) {
+    fn assert_every_nth(w: &Vec<Window>, n: usize, window_size: Option<usize>) {
         for (i, r) in w.iter().enumerate() {
             if i % n == 0 {
                 if window_size.is_none() {
-                    assert!(r.is_none());
+                    assert!(r.is_empty());
                     continue;
                 }
 
                 if window_size.is_some() {
-                    assert!(r.is_some());
+                    assert!(r.is_range());
                 }
 
-                if let Some((start, end)) = r {
+                if let Window::Range(start, end) = r {
                     if let Some(window_size) = window_size {
                         assert_eq!(
                             end - start,
@@ -290,12 +328,10 @@ mod tests {
         for i in 0..10 {
             for j in 0..6 {
                 s.push_sample(
+                    Utc.with_ymd_and_hms(2023, 1, 1, 1, i, j * 10)
+                        .unwrap()
+                        .timestamp_millis(),
                     Sample::point(c),
-                    Some(
-                        Utc.with_ymd_and_hms(2023, 1, 1, 1, i, j * 10)
-                            .unwrap()
-                            .timestamp_millis(),
-                    ),
                 );
                 c += 1;
             }
@@ -340,7 +376,43 @@ mod tests {
                 .timestamp_millis(),
         );
 
-        println!("{} - {:?}", windows.len(), windows);
         assert_every_nth(&windows, 5, Some(1));
+    }
+
+    #[test]
+    fn windowing_iterator() {
+        let mut s = Series::new();
+
+        // Make a 10 minute series with 10 second intervals
+        let mut c = 0;
+        for i in 0..10 {
+            for j in 0..6 {
+                s.push_sample(
+                    Utc.with_ymd_and_hms(2023, 1, 1, 1, i, j * 10)
+                        .unwrap()
+                        .timestamp_millis(),
+                    Sample::point(c),
+                );
+                c += 1;
+            }
+        }
+
+        let iter = s.windows_iter(
+            Duration::from_secs(60),
+            Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
+                .unwrap()
+                .timestamp_millis(),
+        );
+
+        for w in iter {
+            match w {
+                Window::Range(start, end) => {
+                    assert_eq!(end - start, 5);
+                }
+                Window::Empty => {
+                    panic!();
+                }
+            }
+        }
     }
 }
