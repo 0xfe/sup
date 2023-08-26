@@ -36,26 +36,20 @@ impl<T: SampleValue> AlignedSeries<T> {
         end_ts: Option<TimeStamp>,
         op: Op<T>,
     ) -> anyhow::Result<Self> {
+        let mut aligned_series = Self::new(interval, start_ts);
+        let mut window_iter = series.windows(interval, start_ts);
+
         if let Some(end_ts) = end_ts {
             if end_ts < start_ts {
                 anyhow::bail!("end_ts must be greater than or equal to start_ts");
             }
+
+            window_iter.set_end_ts(end_ts);
         }
 
-        let mut aligned_series = Self::new(interval, start_ts);
-        let mut window_iter = series.windows(interval, start_ts);
-        let mut current_ts = start_ts.millis();
-
-        for w in window_iter.samples().aggregate(op) {
-            if let Some(end_ts) = end_ts {
-                if current_ts > end_ts.millis() {
-                    break;
-                }
-            }
-
-            aligned_series.push_sample(w);
-            current_ts += interval.millis();
-        }
+        aligned_series
+            .values
+            .extend(window_iter.samples().aggregate(op));
 
         Ok(aligned_series)
     }
@@ -121,7 +115,7 @@ where
             write!(
                 f,
                 "\n {} {}",
-                TimeStamp(self.start_ts.millis() + (i as i64 * self.interval.millis())).to_utc(),
+                TimeStamp(self.start_ts.millis() + (i as i64 * self.interval.millis())),
                 sample
             )?;
         }

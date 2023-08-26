@@ -4,7 +4,6 @@ use crate::{
     base::*,
     element::Element,
     sample::{Sample, SampleValue},
-    util::ts_to_utc,
     window::WindowIter,
 };
 
@@ -94,7 +93,7 @@ impl<T: SampleValue> Default for RawSeries<T> {
 impl<T: SampleValue> fmt::Display for RawSeries<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for sample in self.values.iter() {
-            write!(f, "\n {} {}", ts_to_utc(sample.0), sample.1)?;
+            write!(f, "\n {}", sample)?;
         }
         Ok(())
     }

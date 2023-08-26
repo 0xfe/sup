@@ -1,4 +1,6 @@
 extern crate derive_more;
+use core::fmt;
+
 use derive_more::{Add, Div, From, Into, Mul, Sub};
 
 #[repr(transparent)]
@@ -27,6 +29,12 @@ impl TimeStamp {
     }
 }
 
+impl fmt::Display for TimeStamp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_utc())
+    }
+}
+
 #[repr(transparent)]
 #[derive(From, Into, Debug, PartialEq, Eq, Clone, Ord, PartialOrd, Add, Sub, Mul, Div, Copy)]
 pub struct Duration(pub i64);
@@ -46,5 +54,13 @@ impl Duration {
 
     pub fn from_millis(millis: i64) -> Self {
         Self(millis)
+    }
+}
+
+impl fmt::Display for Duration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let secs = self.0 / 1000;
+        let millis = self.0 % 1000;
+        write!(f, "{}.{:03}s", secs, millis)
     }
 }

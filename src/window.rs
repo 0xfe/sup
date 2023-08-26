@@ -37,6 +37,9 @@ pub struct WindowIter<'a, T: SampleValue> {
     /// The timestamp of the first window.
     start_ts: TimeStamp,
 
+    /// Timestamp of the last window
+    end_ts: Option<TimeStamp>,
+
     /// The number of windows.
     num_windows: usize,
 
@@ -65,11 +68,21 @@ impl<'a, T: SampleValue> WindowIter<'a, T> {
             series,
             window_size,
             start_ts,
+            end_ts: None,
             num_windows: num_windows as usize,
             current_window: 0,
             last_index: 0,
             next: None,
         }
+    }
+
+    pub fn with_end_ts(mut self, end_ts: TimeStamp) -> Self {
+        self.end_ts = Some(end_ts);
+        self
+    }
+
+    pub fn set_end_ts(&mut self, end_ts: TimeStamp) {
+        self.end_ts = Some(end_ts);
     }
 
     pub fn samples(&'a mut self) -> WindowSamples<'a, T> {
@@ -90,6 +103,13 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
         let window_start_ts =
             self.start_ts.millis() + (self.current_window as i64 * self.window_size.millis());
         let window_end_ts = window_start_ts + self.window_size.millis();
+
+        if let Some(end_ts) = self.end_ts {
+            if window_start_ts >= end_ts.millis() {
+                self.next = None;
+                return None;
+            }
+        }
 
         let mut start_index = Some(self.last_index);
         let mut end_index = None;
