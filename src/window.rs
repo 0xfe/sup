@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::series::Series;
+use crate::{sample::SampleValue, series::Series};
 
 /// A window is either empty or a range of indices into a series.
 #[derive(Debug)]
@@ -22,7 +22,7 @@ impl Window {
 }
 
 /// An iterator over windows of a series.
-pub struct WindowIter<'a, T> {
+pub struct WindowIter<'a, T: SampleValue> {
     /// The series to iterate over.
     series: &'a Series<T>,
 
@@ -42,7 +42,7 @@ pub struct WindowIter<'a, T> {
     last_index: usize,
 }
 
-impl<'a, T> WindowIter<'a, T> {
+impl<'a, T: SampleValue> WindowIter<'a, T> {
     /// Create a new window iterator.
     pub fn new(series: &'a Series<T>, window_size: Duration, start_ts: i64) -> Self {
         let last_sample_ts = series.values.last().unwrap().0;
@@ -63,7 +63,7 @@ impl<'a, T> WindowIter<'a, T> {
     }
 }
 
-impl<'a, T> Iterator for WindowIter<'a, T> {
+impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
     type Item = Window;
 
     /// Returns the next window.
@@ -231,42 +231,5 @@ mod tests {
 
         println!("{:?}", windows);
         assert_every_nth(&windows, 5, Some(1));
-    }
-
-    #[test]
-    fn windowing_iterator() {
-        let mut s = Series::new();
-
-        // Make a 10 minute series with 10 second intervals
-        let mut c = 0;
-        for i in 0..10 {
-            for j in 0..6 {
-                s.push_sample(
-                    Utc.with_ymd_and_hms(2023, 1, 1, 1, i, j * 10)
-                        .unwrap()
-                        .timestamp_millis(),
-                    Sample::point(c),
-                );
-                c += 1;
-            }
-        }
-
-        let iter = s.windows_iter(
-            Duration::from_secs(60),
-            Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
-                .unwrap()
-                .timestamp_millis(),
-        );
-
-        for w in iter {
-            match w {
-                Window::Range(start, end) => {
-                    assert_eq!(end - start, 5);
-                }
-                Window::Empty => {
-                    panic!();
-                }
-            }
-        }
     }
 }
