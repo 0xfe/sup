@@ -4,6 +4,8 @@
 
 # DONE
 
+- Base types: TimeStamp and Duration wrapping i64
+  - No more than millisecond granularity needed
 - Sample types
   - Zero/Reset types
   - Point<T>

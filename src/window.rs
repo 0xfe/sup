@@ -1,11 +1,12 @@
 use crate::{
     base::{Duration, TimeStamp},
-    sample::SampleValue,
-    series::{Element, Series},
-    window_ops::Op,
+    element::Element,
+    ops::WindowOp,
+    sample::{Sample, SampleValue},
+    series::RawSeries,
 };
 
-/// A window is either empty or a range of indices into a series.
+/// A window is either empty or a range of indices into a raw series.
 #[derive(Debug, Clone)]
 pub enum Window {
     Empty,
@@ -28,7 +29,7 @@ impl Window {
 /// An iterator over windows of a series.
 pub struct WindowIter<'a, T: SampleValue> {
     /// The series to iterate over.
-    series: &'a Series<T>,
+    series: &'a RawSeries<T>,
 
     /// The size of each window.
     window_size: Duration,
@@ -51,7 +52,7 @@ pub struct WindowIter<'a, T: SampleValue> {
 
 impl<'a, T: SampleValue> WindowIter<'a, T> {
     /// Create a new window iterator.
-    pub fn new(series: &'a Series<T>, window_size: Duration, start_ts: TimeStamp) -> Self {
+    pub fn new(series: &'a RawSeries<T>, window_size: Duration, start_ts: TimeStamp) -> Self {
         let last_sample_ts = series.values.last().unwrap().0;
         let mut num_windows =
             ((last_sample_ts.millis() - start_ts.millis()) / window_size.millis()) + 1;
@@ -69,10 +70,6 @@ impl<'a, T: SampleValue> WindowIter<'a, T> {
             last_index: 0,
             next: None,
         }
-    }
-
-    pub fn aggregate(&'a mut self, f: Op<T>) -> Aggregator<'a, T> {
-        Aggregator { iter: self, f }
     }
 
     pub fn samples(&'a mut self) -> WindowSamples<'a, T> {
@@ -133,39 +130,17 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
     }
 }
 
-pub struct Aggregator<'a, T: SampleValue> {
+pub struct WindowSamples<'a, T: SampleValue> {
     iter: &'a mut WindowIter<'a, T>,
-    f: Op<T>,
 }
 
-impl<'a, T> Iterator for Aggregator<'a, T>
+impl<'a, T> WindowSamples<'a, T>
 where
     T: SampleValue,
 {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|w| match w {
-            Window::Empty => T::zero(),
-            Window::Range(start, end) => {
-                let values = self.iter.series.values[start..=end]
-                    .iter()
-                    .map(|Element(_, s)| s.val())
-                    .collect::<Vec<T>>();
-                (self.f)(&values)
-            }
-        })
+    pub fn aggregate(&'a mut self, f: WindowOp<T>) -> WindowAggregates<'a, T> {
+        WindowAggregates { iter: self, f }
     }
-}
-
-impl<'a, T: SampleValue> From<Aggregator<'a, T>> for WindowIter<'a, T> {
-    fn from(val: Aggregator<'a, T>) -> Self {
-        val.iter.clone()
-    }
-}
-
-pub struct WindowSamples<'a, T: SampleValue> {
-    iter: &'a mut WindowIter<'a, T>,
 }
 
 impl<'a, T> Iterator for WindowSamples<'a, T>
@@ -182,13 +157,29 @@ where
     }
 }
 
+pub struct WindowAggregates<'a, T: SampleValue> {
+    iter: &'a mut WindowSamples<'a, T>,
+    f: WindowOp<T>,
+}
+
+impl<'a, T> Iterator for WindowAggregates<'a, T>
+where
+    T: SampleValue,
+{
+    type Item = Sample<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|w| (self.f)(w))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
 
     use crate::{
+        ops::{max, mean, min},
         sample::Sample,
-        window_ops::{max, mean, min},
     };
 
     use super::*;
@@ -236,7 +227,7 @@ mod tests {
 
     #[test]
     fn windowing() {
-        let mut s = Series::new();
+        let mut s = RawSeries::new();
 
         // Make a 10 minute series with 10 second intervals
         let mut c = 0;
@@ -254,7 +245,7 @@ mod tests {
 
         // Break it into 1 minute windows
         let windows = s
-            .windows_iter(
+            .windows(
                 Duration::from_secs(60),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
@@ -263,15 +254,12 @@ mod tests {
             )
             .collect::<Vec<Window>>();
 
-        for w in windows.clone() {
-            println!("{:?}", w);
-        }
         // Expect 10 windows with 6 samples each
         assert_window_sizes(&windows, 10, 6);
 
         // Break it into 2 minute windows
         let windows = s
-            .windows_iter(
+            .windows(
                 Duration::from_secs(120),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
@@ -284,7 +272,7 @@ mod tests {
 
         // Break it into 30 second windows
         let windows = s
-            .windows_iter(
+            .windows(
                 Duration::from_secs(30),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
@@ -297,7 +285,7 @@ mod tests {
 
         // Break it into 2 second windows
         let windows = s
-            .windows_iter(
+            .windows(
                 Duration::from_secs(2),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
@@ -311,7 +299,7 @@ mod tests {
 
     #[test]
     fn aggregation() {
-        let mut s = Series::new();
+        let mut s = RawSeries::new();
 
         // Make a 10 minute series with 10 second intervals
         let mut c = 0.0;
@@ -328,7 +316,7 @@ mod tests {
         }
 
         // Break it into 1 minute windows
-        let windows = s.windows_iter(
+        let windows = s.windows(
             Duration::from_secs(60),
             Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                 .unwrap()
@@ -336,15 +324,15 @@ mod tests {
                 .into(),
         );
 
-        for i in windows.clone().aggregate(max) {
+        for i in windows.clone().samples().aggregate(max) {
             println!("{:?}", i);
         }
 
-        for i in windows.clone().aggregate(min) {
+        for i in windows.clone().samples().aggregate(min) {
             println!("{:?}", i);
         }
 
-        for i in windows.clone().aggregate(mean) {
+        for i in windows.clone().samples().aggregate(mean) {
             println!("{:?}", i);
         }
     }

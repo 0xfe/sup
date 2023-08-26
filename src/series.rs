@@ -2,32 +2,20 @@ use std::fmt;
 
 use crate::{
     base::*,
+    element::Element,
+    ops::WindowOp,
     sample::{Sample, SampleValue},
     util::ts_to_utc,
     window::WindowIter,
-    window_ops::Op,
 };
 
-#[derive(Debug, Clone)]
-pub struct Element<T: SampleValue>(pub TimeStamp, pub Sample<T>);
-impl<T: SampleValue> fmt::Display for Element<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}", ts_to_utc(self.0), self.1)
-    }
-}
-
-impl<T: SampleValue, U: Into<TimeStamp>> From<(U, Sample<T>)> for Element<T> {
-    fn from((ts, sample): (U, Sample<T>)) -> Self {
-        Self(ts.into(), sample)
-    }
-}
-
-/// `Series` represents an unaligned Time Series.
-pub struct Series<T: SampleValue> {
+/// `RawSeries` represents a series of raw timestamped
+/// data samples.
+pub struct RawSeries<T: SampleValue> {
     pub values: Vec<Element<T>>,
 }
 
-impl<T: SampleValue> Series<T> {
+impl<T: SampleValue> RawSeries<T> {
     /// Create a new empty series.
     pub fn new() -> Self {
         Self { values: vec![] }
@@ -70,7 +58,7 @@ impl<T: SampleValue> Series<T> {
     }
 
     /// Return an iterator over windows of the series.
-    pub fn windows_iter(&self, window_size: Duration, start_ts: TimeStamp) -> WindowIter<T> {
+    pub fn windows(&self, window_size: Duration, start_ts: TimeStamp) -> WindowIter<T> {
         WindowIter::new(self, window_size, start_ts)
     }
 
@@ -98,13 +86,13 @@ impl<T: SampleValue> Series<T> {
     }
 }
 
-impl<T: SampleValue> Default for Series<T> {
+impl<T: SampleValue> Default for RawSeries<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: SampleValue> fmt::Display for Series<T> {
+impl<T: SampleValue> fmt::Display for RawSeries<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for sample in self.values.iter() {
             write!(f, "\n {} {}", ts_to_utc(sample.0), sample.1)?;
@@ -132,12 +120,13 @@ impl<T: SampleValue> AlignedSeries<T> {
         }
     }
 
-    pub fn push_series(&mut self, series: &Series<T>, op: Op<T>) {
+    pub fn push_series(&mut self, series: &RawSeries<T>, op: WindowOp<T>) {
         for v in series
-            .windows_iter(self.interval, self.start_ts)
+            .windows(self.interval, self.start_ts)
+            .samples()
             .aggregate(op)
         {
-            self.push(v);
+            self.push_sample(v);
         }
     }
 
@@ -213,13 +202,13 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::{sample::SampleEquals, window_ops::sum};
+    use crate::{ops::sum, sample::SampleEquals};
 
     use super::*;
 
     #[test]
     fn nearest_after() {
-        let mut series = Series::new();
+        let mut series = RawSeries::new();
         series.push(0, 0);
         series.push(1, 1);
         series.push(2, 2);
@@ -257,7 +246,7 @@ mod tests {
 
     #[test]
     fn nearest_after_random_intervals() {
-        let mut series = Series::new();
+        let mut series = RawSeries::new();
         series.push(0, 0);
         series.push(200, 1);
         series.push(350, 2);
@@ -374,7 +363,7 @@ mod tests {
 
     #[test]
     fn to_aligned_series() {
-        let mut series = Series::new();
+        let mut series = RawSeries::new();
         series.push(0, 1);
         series.push(2, 1);
         series.push(3, 1);
@@ -393,11 +382,11 @@ mod tests {
 
         println!("series: {}\n\n", series);
 
-        for e in series.windows_iter(Duration(5), TimeStamp(0)) {
+        for e in series.windows(Duration(5), TimeStamp(0)) {
             println!("w: {:?}", e);
         }
 
-        for e in series.windows_iter(Duration(5), TimeStamp(0)).samples() {
+        for e in series.windows(Duration(5), TimeStamp(0)).samples() {
             println!("e: {:?}", e);
         }
 

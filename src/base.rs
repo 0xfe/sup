@@ -36,6 +36,10 @@ impl Duration {
         self.0
     }
 
+    pub fn from_minutes(mins: i64) -> Self {
+        Self(mins * 60 * 1000)
+    }
+
     pub fn from_secs(secs: i64) -> Self {
         Self(secs * 1000)
     }
