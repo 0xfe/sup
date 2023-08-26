@@ -1,5 +1,8 @@
 pub mod cpu;
-pub mod stat;
+pub mod sample;
+pub mod series;
+pub mod util;
+pub mod window;
 
 #[cfg(test)]
 mod tests {
