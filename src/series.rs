@@ -1,9 +1,10 @@
-use std::{fmt, time::Duration};
+use std::fmt;
 
 use crate::{
     sample::{Sample, SampleValue},
     util::ts_to_utc,
     window::WindowIter,
+    window_ops::Op,
 };
 
 #[derive(Debug, Clone)]
@@ -68,7 +69,7 @@ impl<T: SampleValue> Series<T> {
     }
 
     /// Return an iterator over windows of the series.
-    pub fn windows_iter(&self, window_size: Duration, start_ts: i64) -> WindowIter<T> {
+    pub fn windows_iter(&self, window_size: i64, start_ts: i64) -> WindowIter<T> {
         WindowIter::new(self, window_size, start_ts)
     }
 
@@ -127,6 +128,15 @@ impl<T: SampleValue> AlignedSeries<T> {
             start_ts,
             interval,
             values: vec![],
+        }
+    }
+
+    pub fn push_series(&mut self, series: &Series<T>, op: Op<T>) {
+        for v in series
+            .windows_iter(self.interval, self.start_ts)
+            .aggregate(op)
+        {
+            self.push(v);
         }
     }
 

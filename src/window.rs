@@ -1,8 +1,7 @@
-use std::time::Duration;
-
 use crate::{
     sample::SampleValue,
     series::{Element, Series},
+    window_ops::Op,
 };
 
 /// A window is either empty or a range of indices into a series.
@@ -31,7 +30,7 @@ pub struct WindowIter<'a, T: SampleValue> {
     series: &'a Series<T>,
 
     /// The size of each window.
-    window_size: Duration,
+    window_size: i64,
 
     /// The timestamp of the first window.
     start_ts: i64,
@@ -51,9 +50,9 @@ pub struct WindowIter<'a, T: SampleValue> {
 
 impl<'a, T: SampleValue> WindowIter<'a, T> {
     /// Create a new window iterator.
-    pub fn new(series: &'a Series<T>, window_size: Duration, start_ts: i64) -> Self {
+    pub fn new(series: &'a Series<T>, window_size: i64, start_ts: i64) -> Self {
         let last_sample_ts = series.values.last().unwrap().0;
-        let mut num_windows = ((last_sample_ts - start_ts) / window_size.as_millis() as i64) + 1;
+        let mut num_windows = ((last_sample_ts - start_ts) / window_size) + 1;
 
         if last_sample_ts < start_ts {
             num_windows = 0;
@@ -70,7 +69,7 @@ impl<'a, T: SampleValue> WindowIter<'a, T> {
         }
     }
 
-    pub fn aggregate(&'a mut self, f: fn(&[T]) -> T) -> Aggregator<'a, T> {
+    pub fn aggregate(&'a mut self, f: Op<T>) -> Aggregator<'a, T> {
         Aggregator { iter: self, f }
     }
 
@@ -89,9 +88,8 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
             return None;
         }
 
-        let window_start_ts =
-            self.start_ts + (self.current_window as i64 * self.window_size.as_millis() as i64);
-        let window_end_ts = window_start_ts + self.window_size.as_millis() as i64;
+        let window_start_ts = self.start_ts + (self.current_window as i64 * self.window_size);
+        let window_end_ts = window_start_ts + self.window_size;
 
         let mut start_index = Some(self.last_index);
         let mut end_index = None;
@@ -134,7 +132,7 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
 
 pub struct Aggregator<'a, T: SampleValue> {
     iter: &'a mut WindowIter<'a, T>,
-    f: fn(&[T]) -> T,
+    f: Op<T>,
 }
 
 impl<'a, T> Iterator for Aggregator<'a, T>
@@ -183,6 +181,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use chrono::{TimeZone, Utc};
 
     use crate::{
@@ -254,7 +254,7 @@ mod tests {
         // Break it into 1 minute windows
         let windows = s
             .windows_iter(
-                Duration::from_secs(60),
+                Duration::from_secs(60).as_millis() as i64,
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
                     .timestamp_millis(),
@@ -267,7 +267,7 @@ mod tests {
         // Break it into 2 minute windows
         let windows = s
             .windows_iter(
-                Duration::from_secs(120),
+                Duration::from_secs(120).as_millis() as i64,
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
                     .timestamp_millis(),
@@ -279,7 +279,7 @@ mod tests {
         // Break it into 30 second windows
         let windows = s
             .windows_iter(
-                Duration::from_secs(30),
+                Duration::from_secs(30).as_millis() as i64,
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
                     .timestamp_millis(),
@@ -291,7 +291,7 @@ mod tests {
         // Break it into 2 second windows
         let windows = s
             .windows_iter(
-                Duration::from_secs(2),
+                Duration::from_secs(2).as_millis() as i64,
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
                     .timestamp_millis(),
@@ -322,7 +322,7 @@ mod tests {
 
         // Break it into 1 minute windows
         let windows = s.windows_iter(
-            Duration::from_secs(60),
+            Duration::from_secs(60).as_millis() as i64,
             Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                 .unwrap()
                 .timestamp_millis(),

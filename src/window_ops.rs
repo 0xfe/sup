@@ -4,6 +4,8 @@ use num_traits::NumCast;
 
 use crate::sample::SampleValue;
 
+pub type Op<T> = fn(&[T]) -> T;
+
 pub fn max<T: SampleValue>(values: &[T]) -> T {
     let mut max = values[0];
     (1..values.len()).for_each(|i| {
