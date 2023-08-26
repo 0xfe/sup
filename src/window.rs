@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use crate::series::Series;
 
+/// A window is either empty or a range of indices into a series.
 #[derive(Debug)]
 pub enum Window {
     Empty,
@@ -9,25 +10,40 @@ pub enum Window {
 }
 
 impl Window {
+    /// Returns true if the window is empty.
     pub fn is_empty(&self) -> bool {
         matches!(self, Self::Empty)
     }
 
+    /// Returns true if the window is a range.
     pub fn is_range(&self) -> bool {
         matches!(self, Self::Range(_, _))
     }
 }
 
+/// An iterator over windows of a series.
 pub struct WindowIter<'a, T> {
+    /// The series to iterate over.
     series: &'a Series<T>,
+
+    /// The size of each window.
     window_size: Duration,
+
+    /// The timestamp of the first window.
     start_ts: i64,
+
+    /// The number of windows.
     num_windows: usize,
+
+    /// The index of the current iterated window
     current_window: usize,
+
+    /// The index of the last sample returned.
     last_index: usize,
 }
 
 impl<'a, T> WindowIter<'a, T> {
+    /// Create a new window iterator.
     pub fn new(series: &'a Series<T>, window_size: Duration, start_ts: i64) -> Self {
         let last_sample_ts = series.values.last().unwrap().0;
         let mut num_windows = ((last_sample_ts - start_ts) / window_size.as_millis() as i64) + 1;
@@ -50,6 +66,7 @@ impl<'a, T> WindowIter<'a, T> {
 impl<'a, T> Iterator for WindowIter<'a, T> {
     type Item = Window;
 
+    /// Returns the next window.
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_window >= self.num_windows {
             return None;
