@@ -21,6 +21,7 @@ impl Window {
     }
 }
 
+#[derive(Clone)]
 /// An iterator over windows of a series.
 pub struct WindowIter<'a, T: SampleValue> {
     /// The series to iterate over.
@@ -66,20 +67,8 @@ impl<'a, T: SampleValue> WindowIter<'a, T> {
         }
     }
 
-    /// Returns the max value of the current window. If the window is empty,
-    /// returns None.
-    pub fn max(&self) -> Option<T> {
-        if let Some(Window::Range(start, end)) = self.next.as_ref() {
-            let mut max = self.series.values[*start].1.val();
-            for i in *start..=*end {
-                let val = self.series.values[i].1.val();
-                if val > max {
-                    max = val;
-                }
-            }
-            return Some(max);
-        }
-        None
+    pub fn aggregate(&'a mut self, f: fn(&[T]) -> T) -> WindowAggregator<'a, T> {
+        WindowAggregator { iter: self, f }
     }
 }
 
@@ -136,11 +125,39 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
     }
 }
 
+pub struct WindowAggregator<'a, T: SampleValue> {
+    iter: &'a mut WindowIter<'a, T>,
+    f: fn(&[T]) -> T,
+}
+
+impl<'a, T> Iterator for WindowAggregator<'a, T>
+where
+    T: SampleValue,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|w| match w {
+            Window::Empty => T::zero(),
+            Window::Range(start, end) => {
+                let values = self.iter.series.values[start..=end]
+                    .iter()
+                    .map(|(_, s)| s.val())
+                    .collect::<Vec<T>>();
+                (self.f)(&values)
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
 
-    use crate::sample::Sample;
+    use crate::{
+        sample::Sample,
+        window_ops::{max, mean, min},
+    };
 
     use super::*;
 
@@ -259,7 +276,7 @@ mod tests {
         let mut s = Series::new();
 
         // Make a 10 minute series with 10 second intervals
-        let mut c = 0;
+        let mut c = 0.0;
         for i in 0..10 {
             for j in 0..6 {
                 s.push_sample(
@@ -268,7 +285,7 @@ mod tests {
                         .timestamp_millis(),
                     Sample::point(c),
                 );
-                c += 1;
+                c += 1.0;
             }
         }
 
@@ -280,7 +297,15 @@ mod tests {
                 .timestamp_millis(),
         );
 
-        for i in windows {
+        for i in windows.clone().aggregate(max) {
+            println!("{:?}", i);
+        }
+
+        for i in windows.clone().aggregate(min) {
+            println!("{:?}", i);
+        }
+
+        for i in windows.clone().aggregate(mean) {
             println!("{:?}", i);
         }
     }
