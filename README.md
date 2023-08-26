@@ -8,7 +8,10 @@
   - Zero/Reset types
   - Point<T>
 - Unaligned TimeSeries
+- Aligned TimeSeries
 - Window Primitive and iterator
+- Window Aggregation iterator
+  - Ops: max, min, mean, oldest, youngest
 
 # TODO
 

@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use crate::{sample::SampleValue, series::Series};
+use crate::{
+    sample::{Sample, SampleValue},
+    series::Series,
+};
 
 /// A window is either empty or a range of indices into a series.
 #[derive(Debug, Clone)]
@@ -67,8 +70,8 @@ impl<'a, T: SampleValue> WindowIter<'a, T> {
         }
     }
 
-    pub fn aggregate(&'a mut self, f: fn(&[T]) -> T) -> WindowAggregator<'a, T> {
-        WindowAggregator { iter: self, f }
+    pub fn aggregate(&'a mut self, f: fn(&[T]) -> T) -> Aggregator<'a, T> {
+        Aggregator { iter: self, f }
     }
 }
 
@@ -125,12 +128,12 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
     }
 }
 
-pub struct WindowAggregator<'a, T: SampleValue> {
+pub struct Aggregator<'a, T: SampleValue> {
     iter: &'a mut WindowIter<'a, T>,
     f: fn(&[T]) -> T,
 }
 
-impl<'a, T> Iterator for WindowAggregator<'a, T>
+impl<'a, T> Iterator for Aggregator<'a, T>
 where
     T: SampleValue,
 {
@@ -146,6 +149,30 @@ where
                     .collect::<Vec<T>>();
                 (self.f)(&values)
             }
+        })
+    }
+}
+
+impl<'a, T: SampleValue> From<Aggregator<'a, T>> for WindowIter<'a, T> {
+    fn from(val: Aggregator<'a, T>) -> Self {
+        val.iter.clone()
+    }
+}
+
+pub struct WindowSamples<'a, T: SampleValue> {
+    iter: &'a mut WindowIter<'a, T>,
+}
+
+impl<'a, T> Iterator for WindowSamples<'a, T>
+where
+    T: SampleValue,
+{
+    type Item = &'a [Sample<T>];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|w| match w {
+            Window::Empty => Some(&[]),
+            Window::Range(start, end) => Some(&self.iter.series.values[start..=end]),
         })
     }
 }
