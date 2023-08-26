@@ -6,9 +6,23 @@ use crate::{
     window::WindowIter,
 };
 
+#[derive(Debug, Clone)]
+pub struct Element<T: SampleValue>(pub i64, pub Sample<T>);
+impl<T: SampleValue> fmt::Display for Element<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", ts_to_utc(self.0), self.1)
+    }
+}
+
+impl<T: SampleValue> From<(i64, Sample<T>)> for Element<T> {
+    fn from((ts, sample): (i64, Sample<T>)) -> Self {
+        Self(ts, sample)
+    }
+}
+
 /// `Series` represents an unaligned Time Series.
 pub struct Series<T: SampleValue> {
-    pub values: Vec<(i64, Sample<T>)>,
+    pub values: Vec<Element<T>>,
 }
 
 impl<T: SampleValue> Series<T> {
@@ -19,7 +33,11 @@ impl<T: SampleValue> Series<T> {
 
     /// Returns the last value in the series.
     pub fn last_val(&self) -> T {
-        self.values.last().unwrap_or(&(0, Sample::zero())).1.val()
+        self.values
+            .last()
+            .unwrap_or(&(0, Sample::zero()).into())
+            .1
+            .val()
     }
 
     /// Add a new sample to the series. The timestamp must be greater than the
@@ -31,7 +49,7 @@ impl<T: SampleValue> Series<T> {
     /// Add a new sample to the series. The timestamp must be greater than the
     /// last sample's timestamp.
     pub fn push_sample(&mut self, ts: i64, sample: Sample<T>) {
-        self.values.push((ts, sample));
+        self.values.push((ts, sample).into());
     }
 
     /// Returns the number of samples in the series.

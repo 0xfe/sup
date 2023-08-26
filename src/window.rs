@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use crate::{
-    sample::{Sample, SampleValue},
-    series::Series,
+    sample::SampleValue,
+    series::{Element, Series},
 };
 
 /// A window is either empty or a range of indices into a series.
@@ -72,6 +72,10 @@ impl<'a, T: SampleValue> WindowIter<'a, T> {
 
     pub fn aggregate(&'a mut self, f: fn(&[T]) -> T) -> Aggregator<'a, T> {
         Aggregator { iter: self, f }
+    }
+
+    pub fn samples(&'a mut self) -> WindowSamples<'a, T> {
+        WindowSamples { iter: self }
     }
 }
 
@@ -145,7 +149,7 @@ where
             Window::Range(start, end) => {
                 let values = self.iter.series.values[start..=end]
                     .iter()
-                    .map(|(_, s)| s.val())
+                    .map(|Element(_, s)| s.val())
                     .collect::<Vec<T>>();
                 (self.f)(&values)
             }
@@ -167,12 +171,12 @@ impl<'a, T> Iterator for WindowSamples<'a, T>
 where
     T: SampleValue,
 {
-    type Item = &'a [Sample<T>];
+    type Item = &'a [Element<T>];
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|w| match w {
-            Window::Empty => Some(&[]),
-            Window::Range(start, end) => Some(&self.iter.series.values[start..=end]),
+            Window::Empty => &self.iter.series.values[0..0],
+            Window::Range(start, end) => &self.iter.series.values[start..=end],
         })
     }
 }
@@ -323,6 +327,12 @@ mod tests {
                 .unwrap()
                 .timestamp_millis(),
         );
+
+        for (i, element) in windows.clone().samples().enumerate() {
+            for e in element {
+                println!("{} {}", i, e);
+            }
+        }
 
         for i in windows.clone().aggregate(max) {
             println!("{:?}", i);
