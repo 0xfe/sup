@@ -120,14 +120,37 @@ impl<T: SampleValue> AlignedSeries<T> {
         }
     }
 
-    pub fn push_series(&mut self, series: &RawSeries<T>, op: WindowOp<T>) {
-        for v in series
-            .windows(self.interval, self.start_ts)
-            .samples()
-            .aggregate(op)
-        {
-            self.push_sample(v);
+    /// Create a new aligned series from a raw series. The raw series is
+    /// aggregated into windows of the given interval.
+    pub fn from_raw_series(
+        series: &RawSeries<T>,
+        interval: Duration,
+        start_ts: TimeStamp,
+        end_ts: Option<TimeStamp>,
+        op: WindowOp<T>,
+    ) -> anyhow::Result<Self> {
+        if let Some(end_ts) = end_ts {
+            if end_ts < start_ts {
+                anyhow::bail!("end_ts must be greater than or equal to start_ts");
+            }
         }
+
+        let mut aligned_series = Self::new(interval, start_ts);
+        let mut window_iter = series.windows(interval, start_ts);
+        let mut current_ts = start_ts.millis();
+
+        for w in window_iter.samples().aggregate(op) {
+            if let Some(end_ts) = end_ts {
+                if current_ts > end_ts.millis() {
+                    break;
+                }
+            }
+
+            aligned_series.push_sample(w);
+            current_ts += interval.millis();
+        }
+
+        Ok(aligned_series)
     }
 
     /// Add a new value to the series.
@@ -390,8 +413,9 @@ mod tests {
             println!("e: {:?}", e);
         }
 
-        let mut aligned_series = AlignedSeries::new(Duration(5), TimeStamp(0));
-        aligned_series.push_series(&series, sum);
-        println!("aligned_series: {}\n\n", aligned_series);
+        let aligned_series =
+            AlignedSeries::from_raw_series(&series, Duration(5), TimeStamp(0), None, sum);
+
+        println!("aligned_series: {}\n\n", aligned_series.unwrap());
     }
 }
