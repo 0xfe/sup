@@ -57,7 +57,7 @@ impl<T: SampleValue> RawSeries<T> {
     }
 
     /// Return an iterator over windows of the series.
-    pub fn windows(&self, window_size: Duration, start_ts: TimeStamp) -> WindowIter<T> {
+    pub fn windows(&self, window_size: Interval, start_ts: TimeStamp) -> WindowIter<T> {
         WindowIter::new(self, window_size, start_ts)
     }
 

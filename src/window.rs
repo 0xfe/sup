@@ -1,5 +1,5 @@
 use crate::{
-    base::{Duration, TimeStamp},
+    base::{Interval, TimeStamp},
     element::Element,
     ops::Op,
     raw_series::RawSeries,
@@ -32,7 +32,7 @@ pub struct WindowIter<'a, T: SampleValue> {
     series: &'a RawSeries<T>,
 
     /// The size of each window.
-    window_size: Duration,
+    window_size: Interval,
 
     /// The timestamp of the first window.
     start_ts: TimeStamp,
@@ -55,7 +55,7 @@ pub struct WindowIter<'a, T: SampleValue> {
 
 impl<'a, T: SampleValue> WindowIter<'a, T> {
     /// Create a new window iterator.
-    pub fn new(series: &'a RawSeries<T>, window_size: Duration, start_ts: TimeStamp) -> Self {
+    pub fn new(series: &'a RawSeries<T>, window_size: Interval, start_ts: TimeStamp) -> Self {
         let last_sample_ts = series.values.last().unwrap().0;
         let mut num_windows =
             ((last_sample_ts.millis() - start_ts.millis()) / window_size.millis()) + 1;
@@ -271,7 +271,7 @@ mod tests {
         // Break it into 1 minute windows
         let windows = s
             .windows(
-                Duration::from_secs(60),
+                Interval::from_secs(60),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
                     .timestamp_millis()
@@ -285,7 +285,7 @@ mod tests {
         // Break it into 1 minute windows with an end timestamp
         let windows = s
             .windows(
-                Duration::from_secs(60),
+                Interval::from_secs(60),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
                     .timestamp_millis()
@@ -305,7 +305,7 @@ mod tests {
         // Break it into 2 minute windows
         let windows = s
             .windows(
-                Duration::from_secs(120),
+                Interval::from_secs(120),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
                     .timestamp_millis()
@@ -318,7 +318,7 @@ mod tests {
         // Break it into 30 second windows
         let windows = s
             .windows(
-                Duration::from_secs(30),
+                Interval::from_secs(30),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
                     .timestamp_millis()
@@ -331,7 +331,7 @@ mod tests {
         // Break it into 2 second windows
         let windows = s
             .windows(
-                Duration::from_secs(2),
+                Interval::from_secs(2),
                 Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                     .unwrap()
                     .timestamp_millis()
@@ -363,7 +363,7 @@ mod tests {
 
         // Break it into 1 minute windows
         let windows = s.windows(
-            Duration::from_secs(60),
+            Interval::from_secs(60),
             Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
                 .unwrap()
                 .timestamp_millis()

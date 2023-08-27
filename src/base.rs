@@ -24,6 +24,10 @@ impl TimeStamp {
         Self(dt.timestamp_millis())
     }
 
+    pub fn align_millis(&self, millis: i64) -> Self {
+        Self(self.0 - (self.0 % millis))
+    }
+
     pub fn millis(&self) -> i64 {
         self.0
     }
@@ -37,9 +41,9 @@ impl fmt::Display for TimeStamp {
 
 #[repr(transparent)]
 #[derive(From, Into, Debug, PartialEq, Eq, Clone, Ord, PartialOrd, Add, Sub, Mul, Div, Copy)]
-pub struct Duration(pub i64);
+pub struct Interval(pub i64);
 
-impl Duration {
+impl Interval {
     pub fn millis(&self) -> i64 {
         self.0
     }
@@ -57,7 +61,7 @@ impl Duration {
     }
 }
 
-impl fmt::Display for Duration {
+impl fmt::Display for Interval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let secs = self.0 / 1000;
         let millis = self.0 % 1000;

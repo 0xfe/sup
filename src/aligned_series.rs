@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::{
-    base::{Duration, TimeStamp},
+    base::{Interval, TimeStamp},
     element::Element,
     ops::Op,
     raw_series::RawSeries,
@@ -13,13 +13,13 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct AlignedSeries<T: SampleValue> {
     pub start_ts: TimeStamp,
-    pub interval: Duration,
+    pub interval: Interval,
     pub values: Vec<Sample<T>>,
 }
 
 impl<T: SampleValue> AlignedSeries<T> {
     /// Create a new empty series.
-    pub fn new(interval: Duration, start_ts: TimeStamp) -> Self {
+    pub fn new(interval: Interval, start_ts: TimeStamp) -> Self {
         Self {
             interval,
             start_ts,
@@ -31,7 +31,7 @@ impl<T: SampleValue> AlignedSeries<T> {
     /// aggregated into windows of the given interval.
     pub fn from_raw_series(
         series: &RawSeries<T>,
-        interval: Duration,
+        interval: Interval,
         start_ts: TimeStamp,
         end_ts: Option<TimeStamp>,
         op: Op<T>,
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn aligned_series() {
-        let mut series = AlignedSeries::new(Duration(100), TimeStamp(1000));
+        let mut series = AlignedSeries::new(Interval(100), TimeStamp(1000));
         series.push(0);
         series.push(1);
         series.push(2);
@@ -202,16 +202,16 @@ mod tests {
 
         println!("series: {}\n\n", series);
 
-        for e in series.windows(Duration(5), TimeStamp(0)) {
+        for e in series.windows(Interval(5), TimeStamp(0)) {
             println!("w: {:?}", e);
         }
 
-        for e in series.windows(Duration(5), TimeStamp(0)).samples() {
+        for e in series.windows(Interval(5), TimeStamp(0)).samples() {
             println!("e: {:?}", e);
         }
 
         let aligned_series =
-            AlignedSeries::from_raw_series(&series, Duration(5), TimeStamp(0), None, sum);
+            AlignedSeries::from_raw_series(&series, Interval(5), TimeStamp(0), None, sum);
 
         println!("aligned_series: {}\n\n", aligned_series.unwrap());
     }

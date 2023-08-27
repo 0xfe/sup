@@ -14,14 +14,10 @@ fn main() {
 
     println!("{}", series);
 
-    // Align at 100ms boundary
-    let start_ts = series.get(0).unwrap().0.millis();
-    let remainder = start_ts % 100;
-
     let series = AlignedSeries::from_raw_series(
         &series,
-        sup::Duration(50),
-        (start_ts - remainder).into(),
+        sup::Interval(50),
+        series.get(0).unwrap().0.align_millis(100),
         None,
         sup::ops::sum,
     )

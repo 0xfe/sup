@@ -8,7 +8,7 @@ pub mod util;
 pub mod window;
 
 pub use aligned_series::AlignedSeries;
-pub use base::{Duration, TimeStamp};
+pub use base::{Interval, TimeStamp};
 pub use element::Element;
 pub use raw_series::RawSeries;
 pub use sample::Sample;
