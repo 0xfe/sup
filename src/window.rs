@@ -124,7 +124,11 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
         if let Some(start_index) = start_index {
             for (j, sample) in self.series.values.iter().enumerate().skip(start_index) {
                 if sample.0.millis() >= window_end_ts {
-                    end_index = Some(j - 1);
+                    if j == 0 {
+                        end_index = Some(j)
+                    } else {
+                        end_index = Some(j - 1);
+                    }
                     break;
                 }
             }
@@ -256,7 +260,8 @@ mod tests {
                 s.push_sample(
                     Utc.with_ymd_and_hms(2023, 1, 1, 1, i, j * 10)
                         .unwrap()
-                        .timestamp_millis(),
+                        .timestamp_millis()
+                        .into(),
                     Sample::point(c),
                 );
                 c += 1;
@@ -348,7 +353,8 @@ mod tests {
                 s.push_sample(
                     Utc.with_ymd_and_hms(2023, 1, 1, 1, i, j * 10)
                         .unwrap()
-                        .timestamp_millis(),
+                        .timestamp_millis()
+                        .into(),
                     Sample::point(c),
                 );
                 c += 1.0;

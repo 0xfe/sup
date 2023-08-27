@@ -10,7 +10,7 @@ use crate::{
 
 /// `AlignedSeries` represents Time Series with a fixed interval between
 /// samples.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AlignedSeries<T: SampleValue> {
     pub start_ts: TimeStamp,
     pub interval: Duration,
@@ -184,21 +184,21 @@ mod tests {
     #[test]
     fn to_aligned_series() {
         let mut series = RawSeries::new();
-        series.push(0, 1);
-        series.push(2, 1);
-        series.push(3, 1);
-        series.push(4, 1);
-        series.push(6, 1);
-        series.push(7, 1);
-        series.push(9, 1);
-        series.push(15, 1);
-        series.push(22, 1);
-        series.push(28, 1);
-        series.push(30, 1);
-        series.push(31, 1);
-        series.push(32, 1);
-        series.push(35, 1);
-        series.push(40, 1);
+        series.push(0.into(), 1);
+        series.push(2.into(), 1);
+        series.push(3.into(), 1);
+        series.push(4.into(), 1);
+        series.push(6.into(), 1);
+        series.push(7.into(), 1);
+        series.push(9.into(), 1);
+        series.push(15.into(), 1);
+        series.push(22.into(), 1);
+        series.push(28.into(), 1);
+        series.push(30.into(), 1);
+        series.push(31.into(), 1);
+        series.push(32.into(), 1);
+        series.push(35.into(), 1);
+        series.push(40.into(), 1);
 
         println!("series: {}\n\n", series);
 

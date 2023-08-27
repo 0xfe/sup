@@ -9,6 +9,7 @@ use crate::{
 
 /// `RawSeries` represents a series of raw timestamped
 /// data samples.
+#[derive(Debug, Clone)]
 pub struct RawSeries<T: SampleValue> {
     pub values: Vec<Element<T>>,
 }
@@ -30,13 +31,13 @@ impl<T: SampleValue> RawSeries<T> {
 
     /// Add a new sample to the series. The timestamp must be greater than the
     /// last sample's timestamp.
-    pub fn push(&mut self, ts: i64, value: T) {
+    pub fn push(&mut self, ts: TimeStamp, value: T) {
         self.push_sample(ts, Sample::point(value))
     }
 
     /// Add a new sample to the series. The timestamp must be greater than the
     /// last sample's timestamp.
-    pub fn push_sample(&mut self, ts: i64, sample: Sample<T>) {
+    pub fn push_sample(&mut self, ts: TimeStamp, sample: Sample<T>) {
         self.values.push((ts, sample).into());
     }
 
@@ -107,16 +108,16 @@ mod tests {
     #[test]
     fn nearest_after() {
         let mut series = RawSeries::new();
-        series.push(0, 0);
-        series.push(1, 1);
-        series.push(2, 2);
-        series.push(3, 3);
-        series.push(4, 4);
-        series.push(5, 5);
-        series.push(6, 6);
-        series.push(7, 7);
-        series.push(8, 8);
-        series.push(9, 9);
+        series.push(0.into(), 0);
+        series.push(1.into(), 1);
+        series.push(2.into(), 2);
+        series.push(3.into(), 3);
+        series.push(4.into(), 4);
+        series.push(5.into(), 5);
+        series.push(6.into(), 6);
+        series.push(7.into(), 7);
+        series.push(8.into(), 8);
+        series.push(9.into(), 9);
 
         assert_eq!(series.at_or_after(TimeStamp(0)).unwrap().0, TimeStamp(0));
         assert!(series
@@ -145,14 +146,14 @@ mod tests {
     #[test]
     fn nearest_after_random_intervals() {
         let mut series = RawSeries::new();
-        series.push(0, 0);
-        series.push(200, 1);
-        series.push(350, 2);
-        series.push(500, 3);
-        series.push(1023, 4);
-        series.push(3044, 5);
-        series.push(4033, 6);
-        series.push(9000, 7);
+        series.push(0.into(), 0);
+        series.push(200.into(), 1);
+        series.push(350.into(), 2);
+        series.push(500.into(), 3);
+        series.push(1023.into(), 4);
+        series.push(3044.into(), 5);
+        series.push(4033.into(), 6);
+        series.push(9000.into(), 7);
 
         assert_eq!(series.at_or_after(TimeStamp(0)).unwrap().0, 0.into());
         assert!(series
