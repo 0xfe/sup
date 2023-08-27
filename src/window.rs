@@ -64,6 +64,8 @@ impl<'a, T: SampleValue> WindowIter<'a, T> {
             num_windows = 0;
         }
 
+        // TODO: Binary search, set last_index
+
         Self {
             series,
             window_size,
@@ -78,6 +80,9 @@ impl<'a, T: SampleValue> WindowIter<'a, T> {
 
     pub fn with_end_ts(mut self, end_ts: TimeStamp) -> Self {
         self.end_ts = Some(end_ts);
+        self.num_windows =
+            (((end_ts.millis() - self.start_ts.millis()) / self.window_size.millis()) + 1) as usize;
+
         self
     }
 
@@ -98,6 +103,12 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
         if self.current_window >= self.num_windows {
             self.next = None;
             return None;
+        }
+
+        if self.last_index > self.series.values.len() {
+            self.next = Some(Window::Empty);
+            self.current_window += 1;
+            return self.next.clone();
         }
 
         let window_start_ts =
@@ -146,6 +157,7 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
                 }
             } else {
                 // Last window
+                self.last_index = self.series.values.len() + 1;
                 self.next = Some(Window::Range(start_index, self.series.values.len() - 1));
             }
         }
@@ -282,7 +294,7 @@ mod tests {
         // Expect 10 windows with 6 samples each
         assert_window_sizes(&windows, 10, 6);
 
-        // Break it into 1 minute windows with an end timestamp
+        // Break it into 1 minute windows with an early end timestamp
         let windows = s
             .windows(
                 Interval::from_secs(60),
@@ -301,6 +313,26 @@ mod tests {
 
         // Expect 5 windows with 6 samples each
         assert_window_sizes(&windows, 5, 6);
+
+        // Break it into 1 minute windows with a late end timestamp
+        let windows = s
+            .windows(
+                Interval::from_secs(60),
+                Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0)
+                    .unwrap()
+                    .timestamp_millis()
+                    .into(),
+            )
+            .with_end_ts(
+                Utc.with_ymd_and_hms(2023, 1, 1, 1, 19, 0)
+                    .unwrap()
+                    .timestamp_millis()
+                    .into(),
+            )
+            .collect::<Vec<Window>>();
+
+        // Expect 20 windows
+        assert_eq!(windows.len(), 20);
 
         // Break it into 2 minute windows
         let windows = s

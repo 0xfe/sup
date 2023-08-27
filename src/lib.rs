@@ -1,6 +1,7 @@
 pub mod aligned_series;
 pub mod base;
 pub mod element;
+pub mod metric;
 pub mod ops;
 pub mod raw_series;
 pub mod sample;
