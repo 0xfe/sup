@@ -1,4 +1,4 @@
-use sup::{AlignedSeries, RawSeries, TimeStamp};
+use sup::{ops, AlignedSeries, RawSeries, TimeStamp};
 
 fn main() {
     println!("Hello, world!");
@@ -16,7 +16,7 @@ fn main() {
 
     let series = AlignedSeries::from_raw_series(
         &series,
-        sup::Interval(50),
+        sup::Interval(20),
         series.get(0).unwrap().0.align_millis(100),
         None,
         sup::ops::youngest,
@@ -24,4 +24,8 @@ fn main() {
     .unwrap();
 
     println!("\n\n{}", series);
+
+    let deltas = series.sliding_window(2, ops::sample_delta);
+
+    println!("{:?}", deltas)
 }

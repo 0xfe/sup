@@ -1,7 +1,7 @@
 use crate::{
     base::{Interval, TimeStamp},
     element::Element,
-    ops::Op,
+    ops::ElementOp,
     raw_series::RawSeries,
     sample::{Sample, SampleValue},
 };
@@ -176,7 +176,7 @@ impl<'a, T> WindowSamples<'a, T>
 where
     T: SampleValue,
 {
-    pub fn aggregate(&'a mut self, f: Op<T>) -> WindowAggregates<'a, T> {
+    pub fn aggregate(&'a mut self, f: ElementOp<T>) -> WindowAggregates<'a, T> {
         WindowAggregates { iter: self, f }
     }
 }
@@ -197,7 +197,7 @@ where
 
 pub struct WindowAggregates<'a, T: SampleValue> {
     iter: &'a mut WindowSamples<'a, T>,
-    f: Op<T>,
+    f: ElementOp<T>,
 }
 
 impl<'a, T> Iterator for WindowAggregates<'a, T>

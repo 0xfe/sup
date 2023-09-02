@@ -1,9 +1,10 @@
+use anyhow::Result;
 use std::fmt;
 
 use crate::{
     base::{Interval, TimeStamp},
     element::Element,
-    ops::Op,
+    ops::{ElementOp, SampleOp},
     raw_series::RawSeries,
     sample::{Sample, SampleValue},
 };
@@ -34,7 +35,7 @@ impl<T: SampleValue> AlignedSeries<T> {
         interval: Interval,
         start_ts: TimeStamp,
         end_ts: Option<TimeStamp>,
-        op: Op<T>,
+        op: ElementOp<T>,
     ) -> anyhow::Result<Self> {
         let mut aligned_series = Self::new(interval, start_ts);
         let mut window_iter = series.windows(interval, start_ts);
@@ -72,6 +73,25 @@ impl<T: SampleValue> AlignedSeries<T> {
     /// Returns true if the series is empty.
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
+    }
+
+    pub fn sliding_window(&self, len: usize, op: SampleOp<T>) -> Result<Self> {
+        let mut new_series = Self::new(self.interval, self.start_ts);
+
+        for _ in 0..len - 1 {
+            new_series.push_sample(Sample::point(T::zero()));
+        }
+
+        if len > self.values.len() {
+            return Ok(new_series);
+        }
+
+        self.values
+            .windows(len)
+            .map(op)
+            .for_each(|s| new_series.push_sample(s));
+
+        Ok(new_series)
     }
 
     /// Get the nearest sample after or equal to the given timestamp.
