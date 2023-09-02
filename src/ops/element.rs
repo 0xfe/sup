@@ -7,10 +7,9 @@ use crate::{
     sample::{Sample, SampleValue},
 };
 
-pub type ElementOp<T> = fn(&[Element<T>]) -> Sample<T>;
-pub type SampleOp<T> = fn(&[Sample<T>]) -> Sample<T>;
+pub type Op<T> = fn(&[Element<T>]) -> Sample<T>;
 
-pub fn from_str<T>(op: &str) -> Option<ElementOp<T>>
+pub fn from_str<T>(op: &str) -> Option<Op<T>>
 where
     T: SampleValue + NumCast + Div<Output = T> + Sub<Output = T>,
 {
@@ -135,23 +134,6 @@ pub fn delta<T: SampleValue + Sub<Output = T>>(values: &[Element<T>]) -> Sample<
     } else {
         let last = values.last().unwrap().1.val();
         let prev = values.first().unwrap().1.val();
-
-        if last > prev {
-            Sample::Point(last - prev)
-        } else {
-            // TODO: this should be last from Zero
-            Sample::Point(last)
-        }
-    }
-}
-
-pub fn sample_delta<T: SampleValue + Sub<Output = T>>(values: &[Sample<T>]) -> Sample<T> {
-    // TODO: check for Zero point
-    if values.len() != 2 {
-        Sample::Err
-    } else {
-        let last = values.last().unwrap().val();
-        let prev = values.first().unwrap().val();
 
         if last > prev {
             Sample::Point(last - prev)

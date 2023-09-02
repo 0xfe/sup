@@ -19,13 +19,13 @@ fn main() {
         sup::Interval(20),
         series.get(0).unwrap().0.align_millis(100),
         None,
-        sup::ops::youngest,
+        ops::element::youngest,
     )
     .unwrap();
 
     println!("\n\n{}", series);
 
-    let deltas = series.sliding_window(2, ops::sample_delta);
+    let deltas = series.sliding_window(2, ops::sample::delta);
 
     println!("{:?}", deltas)
 }

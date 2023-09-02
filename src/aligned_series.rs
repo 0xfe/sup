@@ -4,7 +4,7 @@ use std::fmt;
 use crate::{
     base::{Interval, TimeStamp},
     element::Element,
-    ops::{ElementOp, SampleOp},
+    ops::{element, sample},
     raw_series::RawSeries,
     sample::{Sample, SampleValue},
 };
@@ -35,7 +35,7 @@ impl<T: SampleValue> AlignedSeries<T> {
         interval: Interval,
         start_ts: TimeStamp,
         end_ts: Option<TimeStamp>,
-        op: ElementOp<T>,
+        op: element::Op<T>,
     ) -> anyhow::Result<Self> {
         let mut aligned_series = Self::new(interval, start_ts);
         let mut window_iter = series.windows(interval, start_ts);
@@ -75,7 +75,7 @@ impl<T: SampleValue> AlignedSeries<T> {
         self.values.is_empty()
     }
 
-    pub fn sliding_window(&self, len: usize, op: SampleOp<T>) -> Result<Self> {
+    pub fn sliding_window(&self, len: usize, op: sample::Op<T>) -> Result<Self> {
         let mut new_series = Self::new(self.interval, self.start_ts);
 
         for _ in 0..len - 1 {
@@ -146,7 +146,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ops::sum, sample::SampleEquals};
+    use crate::{ops::element::sum, sample::SampleEquals};
 
     #[test]
     fn aligned_series() {
