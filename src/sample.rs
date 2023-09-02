@@ -18,6 +18,7 @@ pub enum Sample<T: SampleValue> {
     Err,
     Zero, // Reset
     Point(T),
+    Fake(T), // Extrapolated values
 }
 
 impl<T: SampleValue> Sample<T> {
@@ -47,6 +48,7 @@ impl<T: SampleValue> Sample<T> {
             Self::Err => T::zero(),
             Self::Zero => T::zero(),
             Self::Point(v) => *v,
+            Self::Fake(v) => *v,
         }
     }
 }
@@ -57,6 +59,7 @@ impl<T: SampleValue> fmt::Display for Sample<T> {
             Self::Err => write!(f, "Err"),
             Self::Zero => write!(f, "Zero({})", T::zero()),
             Self::Point(v) => write!(f, "Point({})", v),
+            Self::Fake(v) => write!(f, "Fake({})", v),
         }
     }
 }

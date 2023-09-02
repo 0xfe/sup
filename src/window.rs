@@ -122,7 +122,7 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
             }
         }
 
-        let mut start_index = Some(self.last_index);
+        let mut start_index = None;
         let mut end_index = None;
 
         for (j, element) in self.series.values.iter().enumerate().skip(self.last_index) {
@@ -160,6 +160,8 @@ impl<'a, T: SampleValue> Iterator for WindowIter<'a, T> {
                 self.last_index = self.series.values.len() + 1;
                 self.next = Some(Window::Range(start_index, self.series.values.len() - 1));
             }
+        } else {
+            self.next = Some(Window::Empty)
         }
 
         self.next.clone()

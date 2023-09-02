@@ -7,8 +7,8 @@ fn main() {
     let mut series = RawSeries::new();
 
     // Add values every 10ms
-    for _ in 1..=10 {
-        series.push(TimeStamp::now(), 10);
+    for i in 1..=10 {
+        series.push(TimeStamp::now(), 10 + i);
         std::thread::sleep(std::time::Duration::from_millis(10))
     }
 
@@ -19,7 +19,7 @@ fn main() {
         sup::Interval(50),
         series.get(0).unwrap().0.align_millis(100),
         None,
-        sup::ops::sum,
+        sup::ops::youngest,
     )
     .unwrap();
 
