@@ -4,7 +4,9 @@ use core::fmt;
 use derive_more::{Add, Div, From, Into, Mul, Sub};
 
 #[repr(transparent)]
-#[derive(From, Into, Debug, PartialEq, Eq, Clone, Ord, PartialOrd, Add, Sub, Mul, Div, Copy)]
+#[derive(
+    From, Into, Debug, PartialEq, Eq, Clone, Ord, PartialOrd, Hash, Add, Sub, Mul, Div, Copy,
+)]
 pub struct TimeStamp(pub i64);
 
 impl TimeStamp {
@@ -40,7 +42,9 @@ impl fmt::Display for TimeStamp {
 }
 
 #[repr(transparent)]
-#[derive(From, Into, Debug, PartialEq, Eq, Clone, Ord, PartialOrd, Add, Sub, Mul, Div, Copy)]
+#[derive(
+    From, Into, Debug, PartialEq, Eq, Clone, Ord, PartialOrd, Hash, Add, Sub, Mul, Div, Copy,
+)]
 pub struct Interval(pub i64);
 
 impl Interval {

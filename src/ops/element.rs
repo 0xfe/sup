@@ -1,17 +1,13 @@
-use std::ops::{Div, Sub};
-
-use num_traits::NumCast;
-
 use crate::{
     element::Element,
-    sample::{Sample, SampleValue},
+    sample::{Sample, SampleValue, SampleValueOp},
 };
 
 pub type Op<T> = fn(&[Element<T>]) -> Sample<T>;
 
 pub fn from_str<T>(op: &str) -> Option<Op<T>>
 where
-    T: SampleValue + NumCast + Div<Output = T> + Sub<Output = T>,
+    T: SampleValueOp<T>
 {
     match op {
         "max" => Some(max),
@@ -101,7 +97,7 @@ pub fn sum<T: SampleValue>(values: &[Element<T>]) -> Sample<T> {
     Sample::Point(sum)
 }
 
-pub fn mean<T: SampleValue + NumCast + Div<Output = T>>(values: &[Element<T>]) -> Sample<T> {
+pub fn mean<T: SampleValueOp<T>>(values: &[Element<T>]) -> Sample<T> {
     let mut sum = T::zero();
 
     for elem in values.iter() {
@@ -127,7 +123,7 @@ pub fn youngest<T: SampleValue>(values: &[Element<T>]) -> Sample<T> {
     }
 }
 
-pub fn delta<T: SampleValue + Sub<Output = T>>(values: &[Element<T>]) -> Sample<T> {
+pub fn delta<T: SampleValueOp<T>>(values: &[Element<T>]) -> Sample<T> {
     // TODO: check for Zero point
     if values.len() != 2 {
         Sample::Err

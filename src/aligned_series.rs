@@ -75,7 +75,9 @@ impl<T: SampleValue> AlignedSeries<T> {
         self.values.is_empty()
     }
 
-    pub fn sliding_window(&self, len: usize, op: sample::Op<T>) -> Result<Self> {
+    /// Returns a new AlignedSeries constructed from running the given `op` over
+    /// a sliding window of length `len`.
+    pub fn sliding_aggregate(&self, len: usize, op: sample::Op<T>) -> Result<Self> {
         let mut new_series = Self::new(self.interval, self.start_ts);
 
         for _ in 0..len - 1 {

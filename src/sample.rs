@@ -1,13 +1,20 @@
-use num_traits::Zero;
-use std::fmt;
+use num_traits::{Zero, NumCast};
+use std::{fmt, ops::{Sub, Div}};
 
-pub trait SampleValue: Zero + Copy + PartialEq + PartialOrd + fmt::Display {}
+pub trait SampleValue: Zero + Copy + PartialEq + PartialOrd + NumCast + fmt::Display {}
+pub trait SampleValueOp<T>: SampleValue + Div<Output=T> + Sub<Output = T> + Sized {}
 
 impl SampleValue for i32 {}
 impl SampleValue for i64 {}
 impl SampleValue for i128 {}
 impl SampleValue for f32 {}
 impl SampleValue for f64 {}
+
+impl SampleValueOp<i32> for i32 {}
+impl SampleValueOp<i64> for i64 {}
+impl SampleValueOp<i128> for i128 {}
+impl SampleValueOp<f32> for f32 {}
+impl SampleValueOp<f64> for f64 {}
 
 pub trait SampleEquals {
     fn equals(&self, other: &Self) -> bool;
